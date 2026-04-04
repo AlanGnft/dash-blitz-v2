@@ -170,6 +170,21 @@
                   inset 0 1px 0 rgba(255,255,255,0.12);
     }
     .play-btn:active { transform: scale(0.96); }
+
+    /* ---- Chaser danger overlay ---- */
+    /* Grows up from the bottom as The Muncher closes in */
+    #dangerOverlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+      background: radial-gradient(ellipse at 50% 115%,
+        rgba(232,32,26,0.82) 0%,
+        rgba(232,32,26,0.28) 38%,
+        transparent 65%);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
   </style>
 </head>
 <body>
@@ -188,8 +203,8 @@
   <div class="deco"></div>
   <div class="tap-prompt">Tap to Play</div>
   <div class="hint">
-    <span>← →</span> Switch lanes &nbsp;&nbsp; <span>↑ / Space</span> Jump<br>
-    Swipe left / right / up on mobile
+    <span>← →</span> Switch lanes &nbsp;&nbsp; <span>↑ / Space</span> Jump &nbsp;&nbsp; <span>↓ / S</span> Slam<br>
+    Swipe left / right / up / down on mobile
   </div>
 </div>
 
@@ -201,6 +216,9 @@
   <div class="final-score" id="finalScore">0</div>
   <button class="play-btn" id="playAgainBtn">Play Again</button>
 </div>
+
+<!-- Chaser danger vignette (always present, opacity driven by JS) -->
+<div id="dangerOverlay"></div>
 
 <!-- Babylon.js 7.x -->
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
@@ -226,33 +244,50 @@ scene.fogColor   = new BABYLON.Color3(0.05, 0.05, 0.055);
 scene.fogDensity = 0.022;
 
 // ---- Config --------------------------------------------------------
-const LANE_X     = [-2.2, 0, 2.2];   // world X per lane
-const TRACK_W    = 7.2;
-const TILE_D     = 8;                 // depth per ground tile
-const TILE_N     = 16;                // number of looping tiles
-const WRAP_Q     = TILE_N * TILE_D;   // wrap quantum (128 units)
-const SPAWN_Z    = 62;
-const DESPAWN_Z  = -14;
+const LANE_X      = [-2.2, 0, 2.2];
+const TRACK_W     = 7.2;
+const TILE_D      = 8;
+const TILE_N      = 16;
+const WRAP_Q      = TILE_N * TILE_D;
+const SPAWN_Z     = 62;
+const DESPAWN_Z   = -14;
 
-const BASE_SPD   = 12;    // comfortable starting speed
-const MAX_SPD    = 30;    // genuinely intense ceiling
-const ACCEL      = 0.28;  // units/s² — takes ~65s to reach max (earned)
-const JUMP_V     = 13.0;  // initial upward velocity
-const GRAV_RISE  = -30;   // steeper rise — punchy, no float
-const GRAV_FALL  = -52;   // fast fall — barely left the ground feel
-const GROUND_Y   = 0.55;
-const LANE_DUR   = 0.13;  // 130ms lane-switch duration
+const BASE_SPD    = 12;     // comfortable starting pace
+const MAX_SPD     = 30;     // genuinely intense ceiling
+const ACCEL       = 0.28;   // ~65s to reach max — earned
 
-const POOL_SZ    = 14;
-const SPAWN_T0   = 2.5;   // generous at game start
-const SPAWN_TMIN = 0.85;
+// Jump: punchy arc, faster fall than rise.
+// Apex ≈ 2.82 units, total air time ≈ 0.76s.
+const JUMP_V      = 13.0;
+const GRAV_RISE   = -30;
+const GRAV_FALL   = -52;
+const GROUND_Y    = 0.55;
+
+// Lane switch: ease-in-out cubic over 130ms
+const LANE_DUR    = 0.13;
+
+const POOL_SZ     = 14;
+const SPAWN_T0    = 2.5;
+const SPAWN_TMIN  = 0.85;
+
+// Squash / slam
+const SQUASH_DUR  = 0.20;   // seconds for squash animation
+
+// Chaser ("The Muncher")
+const CHASER_MAX     = 28;  // full retreat — comfortably safe
+const CHASER_START   = 22;  // distance at run start
+const CHASER_RETREAT = 1.8; // units/s it falls behind during clean run
+const CHASER_SURGE1  = 16;  // distance it closes on first graze
 
 // ---- Camera --------------------------------------------------------
+// Positioned higher and further back so The Muncher is visible
+// at the bottom of the screen when it gets close.
 const camera = new BABYLON.FreeCamera('cam',
-  new BABYLON.Vector3(0, 5.8, -10), scene);
-camera.setTarget(new BABYLON.Vector3(0, 1.2, 22));
+  new BABYLON.Vector3(0, 7, -11), scene);
+camera.setTarget(new BABYLON.Vector3(0, 0.8, 20));
+camera.fov  = 0.9;   // slightly wider FOV
 camera.minZ = 0.1;
-camera.maxZ = 200;
+camera.maxZ = 220;
 
 // ---- Lighting ------------------------------------------------------
 const hemi = new BABYLON.HemisphericLight('hemi',
@@ -306,37 +341,36 @@ matObs.roughness            = 0.62;
 matObs.environmentIntensity = 0.2;
 
 // ---- Track ---------------------------------------------------------
-// Five arrays of TILE_N meshes each; all scroll at game speed.
 const gTiles = [], gEdgeL = [], gEdgeR = [], gDivL = [], gDivR = [];
 
 for (let i = 0; i < TILE_N; i++) {
   const z = i * TILE_D;
 
-  const tile = BABYLON.MeshBuilder.CreateBox('gt' + i,
+  const tile = BABYLON.MeshBuilder.CreateBox('gt'+i,
     { width: TRACK_W, height: 0.14, depth: TILE_D }, scene);
   tile.material = matTrack;
   tile.position.set(0, -0.07, z);
   gTiles.push(tile);
 
-  const el = BABYLON.MeshBuilder.CreateBox('el' + i,
+  const el = BABYLON.MeshBuilder.CreateBox('el'+i,
     { width: 0.11, height: 0.13, depth: TILE_D }, scene);
   el.material = matEdge;
   el.position.set(-(TRACK_W / 2 - 0.06), 0.01, z);
   gEdgeL.push(el);
 
-  const er = BABYLON.MeshBuilder.CreateBox('er' + i,
+  const er = BABYLON.MeshBuilder.CreateBox('er'+i,
     { width: 0.11, height: 0.13, depth: TILE_D }, scene);
   er.material = matEdge;
   er.position.set(TRACK_W / 2 - 0.06, 0.01, z);
   gEdgeR.push(er);
 
-  const dl = BABYLON.MeshBuilder.CreateBox('dl' + i,
+  const dl = BABYLON.MeshBuilder.CreateBox('dl'+i,
     { width: 0.055, height: 0.09, depth: TILE_D }, scene);
   dl.material = matDiv;
   dl.position.set(-1.1, 0.01, z);
   gDivL.push(dl);
 
-  const dr = BABYLON.MeshBuilder.CreateBox('dr' + i,
+  const dr = BABYLON.MeshBuilder.CreateBox('dr'+i,
     { width: 0.055, height: 0.09, depth: TILE_D }, scene);
   dr.material = matDiv;
   dr.position.set(1.1, 0.01, z);
@@ -370,7 +404,7 @@ pBody.material = matApple;
 
 const pLeaf = BABYLON.MeshBuilder.CreateSphere('leaf',
   { diameter: 0.52, segments: 10 }, scene);
-pLeaf.material  = matLeaf;
+pLeaf.material = matLeaf;
 pLeaf.scaling.set(0.72, 0.32, 0.9);
 
 const pStem = BABYLON.MeshBuilder.CreateCylinder('stem',
@@ -378,12 +412,12 @@ const pStem = BABYLON.MeshBuilder.CreateCylinder('stem',
 pStem.material = matStem;
 
 // Player state
-const lane  = { cur: 1, tgt: 1 };
-const pPos  = { x: LANE_X[1], y: GROUND_Y };
-let velY    = 0;
-let jumping = false;
+const lane      = { cur: 1, tgt: 1 };
+const pPos      = { x: LANE_X[1], y: GROUND_Y };
+let velY        = 0;
+let jumping     = false;
+let squashT     = 0;  // counts down from SQUASH_DUR after landing/slam
 
-// Lane-switch tween (ease-in-out cubic over LANE_DUR seconds)
 const laneTween = { fromX: LANE_X[1], toX: LANE_X[1], p: 1.0 };
 const easeInOut = t => t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t;
 
@@ -399,15 +433,53 @@ function resetPlayer() {
   pPos.y   = GROUND_Y;
   velY     = 0;
   jumping  = false;
+  squashT  = 0;
   laneTween.fromX = LANE_X[1];
   laneTween.toX   = LANE_X[1];
   laneTween.p     = 1;
+  pBody.scaling.set(1, 1, 1);
+  pLeaf.scaling.set(0.72, 0.32, 0.9);
+  pStem.scaling.set(1, 1, 1);
   placePlayer();
 }
 resetPlayer();
 
+// ---- Dust particles (slam / landing impact) ------------------------
+// Particle texture: soft radial gradient, generated from a canvas
+const _ptc  = document.createElement('canvas');
+_ptc.width  = _ptc.height = 32;
+const _pctx = _ptc.getContext('2d');
+const _pgr  = _pctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+_pgr.addColorStop(0,   'rgba(255,235,180,1)');
+_pgr.addColorStop(0.5, 'rgba(220,195,150,0.6)');
+_pgr.addColorStop(1,   'rgba(200,170,120,0)');
+_pctx.fillStyle = _pgr;
+_pctx.beginPath(); _pctx.arc(16, 16, 16, 0, Math.PI * 2); _pctx.fill();
+
+const dustPS = new BABYLON.ParticleSystem('dust', 40, scene);
+dustPS.particleTexture = new BABYLON.Texture(_ptc.toDataURL(), scene);
+dustPS.emitter         = new BABYLON.Vector3(0, GROUND_Y, 0);
+dustPS.minEmitBox      = new BABYLON.Vector3(-0.4, 0, -0.3);
+dustPS.maxEmitBox      = new BABYLON.Vector3(0.4,  0,  0.3);
+dustPS.direction1      = new BABYLON.Vector3(-3, 1, -2);
+dustPS.direction2      = new BABYLON.Vector3(3,  4,  2);
+dustPS.minSize         = 0.06; dustPS.maxSize     = 0.22;
+dustPS.minLifeTime     = 0.12; dustPS.maxLifeTime = 0.30;
+dustPS.minEmitPower    = 1.5;  dustPS.maxEmitPower = 4.5;
+dustPS.emitRate        = 0;    // burst-only
+dustPS.gravity         = new BABYLON.Vector3(0, -9, 0);
+dustPS.color1          = new BABYLON.Color4(0.92, 0.82, 0.68, 1);
+dustPS.color2          = new BABYLON.Color4(0.78, 0.68, 0.52, 0.7);
+dustPS.colorDead       = new BABYLON.Color4(0.60, 0.52, 0.38, 0);
+dustPS.blendMode       = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
+
+function burstDust(x) {
+  dustPS.emitter.x       = x;
+  dustPS.manualEmitCount = 22;
+  dustPS.start();
+}
+
 // ---- Obstacle Pool -------------------------------------------------
-// One invisible template; all pool members are instances of it.
 const obsTpl = BABYLON.MeshBuilder.CreateBox('obs_tpl',
   { width: 1.0, height: 1.1, depth: 1.0 }, scene);
 obsTpl.material  = matObs;
@@ -417,16 +489,16 @@ const obsPool   = [];
 const obsActive = [];
 
 for (let i = 0; i < POOL_SZ; i++) {
-  const inst      = obsTpl.createInstance('obs_' + i);
-  inst.isVisible  = false;
-  inst._active    = false;
+  const inst     = obsTpl.createInstance('obs_' + i);
+  inst.isVisible = false;
+  inst._active   = false;
   obsPool.push(inst);
 }
 
 function spawnObs() {
   const m = obsPool.find(o => !o._active);
   if (!m) return;
-  const l     = Math.floor(Math.random() * 3);
+  const l    = Math.floor(Math.random() * 3);
   m.position.set(LANE_X[l], 0.55, SPAWN_Z);
   m.isVisible = true;
   m._active   = true;
@@ -445,17 +517,138 @@ function clearObs() {
   while (obsActive.length) despawnObs(obsActive[0]);
 }
 
-// ---- Collision (AABB) ----------------------------------------------
-function checkCollision() {
-  const { x: px, y: py } = pPos;
+// ---- Collision detection -------------------------------------------
+// Returns 'HIT' (head-on → instant death),
+//         'GRAZE' (side clip → chaser surges),
+//         or null (clean).
+function checkCollisions() {
+  const px = pPos.x, py = pPos.y;
   for (const m of obsActive) {
-    if (Math.abs(px - m.position.x) < 0.70 &&
-        Math.abs(py - m.position.y) < 0.78 &&
-        Math.abs(      m.position.z) < 0.70) {  // player is always at z=0
-      return true;
-    }
+    const dz = Math.abs(m.position.z);      if (dz > 0.75) continue;
+    const dy = Math.abs(py - m.position.y); if (dy > 0.82) continue;
+    const dx = Math.abs(px - m.position.x);
+    if (dx < 0.62) return 'HIT';
+    if (dx < 0.92) return 'GRAZE';
   }
-  return false;
+  return null;
+}
+
+// ================================================================
+//  THE MUNCHER  —  chaser character
+//  A giant hungry mouth that wants to eat the apple.
+//  Visible at the bottom of the screen when it gets close.
+// ================================================================
+
+const matMBody = new BABYLON.StandardMaterial('mBody', scene);
+matMBody.diffuseColor  = new BABYLON.Color3(0.16, 0.08, 0.28);
+matMBody.emissiveColor = new BABYLON.Color3(0.05, 0.02, 0.10);
+
+const matMJaw = new BABYLON.StandardMaterial('mJaw', scene);
+matMJaw.diffuseColor  = new BABYLON.Color3(0.20, 0.10, 0.34);
+matMJaw.emissiveColor = new BABYLON.Color3(0.06, 0.02, 0.12);
+
+const matMTeeth = new BABYLON.StandardMaterial('mTeeth', scene);
+matMTeeth.diffuseColor  = new BABYLON.Color3(0.96, 0.93, 0.88);
+matMTeeth.emissiveColor = new BABYLON.Color3(0.12, 0.10, 0.08);
+
+const matMMouth = new BABYLON.StandardMaterial('mMouth', scene);
+matMMouth.diffuseColor  = new BABYLON.Color3(0.55, 0.04, 0.06);
+matMMouth.emissiveColor = new BABYLON.Color3(0.38, 0.02, 0.03);
+
+const matMEye = new BABYLON.StandardMaterial('mEye', scene);
+matMEye.diffuseColor  = new BABYLON.Color3(1, 1, 1);
+matMEye.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+
+const matMPupil = new BABYLON.StandardMaterial('mPupil', scene);
+matMPupil.diffuseColor  = new BABYLON.Color3(0.9, 0.06, 0.02);
+matMPupil.emissiveColor = new BABYLON.Color3(0.65, 0.03, 0.01);
+
+// Root node — we only move this
+const muncher = new BABYLON.TransformNode('muncher', scene);
+
+// Body — wide squished sphere
+const mBody = BABYLON.MeshBuilder.CreateSphere('mBody',
+  { diameter: 4.2, segments: 12 }, scene);
+mBody.material = matMBody;
+mBody.scaling.set(1.0, 0.55, 0.9);
+mBody.position.y = 1.2;
+mBody.parent = muncher;
+
+// Mouth interior (deep red, visible between jaws)
+const mMouth = BABYLON.MeshBuilder.CreateBox('mMouth',
+  { width: 3.1, height: 0.85, depth: 1.2 }, scene);
+mMouth.material = matMMouth;
+mMouth.position.y = 2.4;
+mMouth.parent = muncher;
+
+// Upper jaw
+const mJawU = BABYLON.MeshBuilder.CreateBox('mJawU',
+  { width: 3.5, height: 0.62, depth: 1.55 }, scene);
+mJawU.material = matMJaw;
+mJawU.position.y = 2.88;
+mJawU.parent = muncher;
+
+// Lower jaw
+const mJawL = BABYLON.MeshBuilder.CreateBox('mJawL',
+  { width: 3.5, height: 0.52, depth: 1.55 }, scene);
+mJawL.material = matMJaw;
+mJawL.position.y = 1.94;
+mJawL.parent = muncher;
+
+// Upper teeth (4)
+for (let i = 0; i < 4; i++) {
+  const t = BABYLON.MeshBuilder.CreateBox('mutT'+i,
+    { width: 0.33, height: 0.56, depth: 0.28 }, scene);
+  t.material  = matMTeeth;
+  t.position.set(-1.35 + i * 0.9, 2.62, -0.62);
+  t.parent = muncher;
+}
+
+// Lower teeth (4)
+for (let i = 0; i < 4; i++) {
+  const t = BABYLON.MeshBuilder.CreateBox('mltT'+i,
+    { width: 0.29, height: 0.48, depth: 0.28 }, scene);
+  t.material  = matMTeeth;
+  t.position.set(-1.35 + i * 0.9, 2.18, -0.62);
+  t.parent = muncher;
+}
+
+// Eyes (white spheres)
+const mEyeL = BABYLON.MeshBuilder.CreateSphere('mEyeL',
+  { diameter: 0.98, segments: 10 }, scene);
+mEyeL.material = matMEye;
+mEyeL.position.set(-0.98, 3.90, -0.52);
+mEyeL.parent = muncher;
+
+const mEyeR = BABYLON.MeshBuilder.CreateSphere('mEyeR',
+  { diameter: 0.98, segments: 10 }, scene);
+mEyeR.material = matMEye;
+mEyeR.position.set(0.98, 3.90, -0.52);
+mEyeR.parent = muncher;
+
+// Pupils (glowing red)
+const mPupilL = BABYLON.MeshBuilder.CreateSphere('mPupilL',
+  { diameter: 0.54, segments: 8 }, scene);
+mPupilL.material = matMPupil;
+mPupilL.position.set(-0.98, 3.90, -0.95);
+mPupilL.parent = muncher;
+
+const mPupilR = BABYLON.MeshBuilder.CreateSphere('mPupilR',
+  { diameter: 0.54, segments: 8 }, scene);
+mPupilR.material = matMPupil;
+mPupilR.position.set(0.98, 3.90, -0.95);
+mPupilR.parent = muncher;
+
+// Park off-screen initially
+muncher.position.set(0, 0, -14);
+let muncherT = 0;  // jaw animation clock
+
+// ---- Chaser state --------------------------------------------------
+const chaser = { dist: CHASER_START, grazes: 0 };
+
+function resetChaser() {
+  chaser.dist   = CHASER_START;
+  chaser.grazes = 0;
 }
 
 // ---- Input ---------------------------------------------------------
@@ -478,12 +671,21 @@ function doRight() {
 function doJump() {
   if (gs === 'PLAY' && !jumping) { velY = JUMP_V; jumping = true; }
 }
+function doSlam() {
+  if (gs !== 'PLAY' || !jumping) return;
+  pPos.y  = GROUND_Y;
+  velY    = 0;
+  jumping = false;
+  squashT = SQUASH_DUR;        // full squash on slam (deeper than normal landing)
+  burstDust(pPos.x);
+}
 
 window.addEventListener('keydown', e => {
   switch (e.key) {
     case 'ArrowLeft':  case 'a': case 'A': doLeft();  break;
     case 'ArrowRight': case 'd': case 'D': doRight(); break;
     case 'ArrowUp':    case 'w': case 'W': case ' ':  doJump(); break;
+    case 'ArrowDown':  case 's': case 'S':             doSlam(); break;
   }
 });
 
@@ -499,7 +701,8 @@ canvas.addEventListener('touchend', e => {
   if (Math.abs(dx) > Math.abs(dy)) {
     if (Math.abs(dx) > 28) dx > 0 ? doRight() : doLeft();
   } else {
-    if (dy < -28) doJump();
+    if      (dy < -28) doJump();
+    else if (dy >  28) doSlam();
   }
 }, { passive: true });
 
@@ -509,16 +712,18 @@ const scoreEl     = document.getElementById('scoreDisplay');
 const finalScEl   = document.getElementById('finalScore');
 const startScr    = document.getElementById('startScreen');
 const gameOverScr = document.getElementById('gameOverScreen');
+const dangerEl    = document.getElementById('dangerOverlay');
 
 document.getElementById('startScreen').addEventListener('click',  startGame);
 document.getElementById('playAgainBtn').addEventListener('click', startGame);
 
-function showHUD()    { hudEl.style.display = 'flex'; }
-function hideHUD()    { hudEl.style.display = 'none';  }
+function showHUD()      { hudEl.style.display = 'flex'; }
+function hideHUD()      { hudEl.style.display = 'none';  }
 function updateScore(s) { scoreEl.textContent = Math.floor(s); }
+function setDanger(v)   { dangerEl.style.opacity = v; }
 
 // ---- Game state ----------------------------------------------------
-let gs         = 'START';  // START | PLAY | DEAD
+let gs         = 'START';
 let score      = 0;
 let speed      = BASE_SPD;
 let spawnTimer = 0;
@@ -531,10 +736,13 @@ function startGame() {
   spawnTimer = 0;
   spawnIv    = SPAWN_T0;
   bobT       = 0;
+  muncherT   = 0;
 
   resetPlayer();
   clearObs();
   resetTrack();
+  resetChaser();
+  setDanger(0);
 
   startScr.classList.add('hidden');
   gameOverScr.classList.add('hidden');
@@ -547,13 +755,13 @@ function startGame() {
 function triggerGameOver() {
   gs = 'DEAD';
   hideHUD();
+  setDanger(0);
   finalScEl.textContent = Math.floor(score);
   gameOverScr.classList.remove('hidden');
 }
 
 // ---- Game loop -----------------------------------------------------
 engine.runRenderLoop(() => {
-  // Cap dt to 50 ms to prevent tunneling on tab-switch resume
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
 
   if (gs === 'PLAY') {
@@ -561,22 +769,17 @@ engine.runRenderLoop(() => {
     // Speed ramp
     speed = Math.min(speed + ACCEL * dt, MAX_SPD);
 
-    // Score: proportional to distance travelled
+    // Score: distance-based
     score += speed * dt * 0.5;
     updateScore(score);
 
-    // Shrink spawn interval as speed grows
-    const t = (speed - BASE_SPD) / (MAX_SPD - BASE_SPD);
-    spawnIv = SPAWN_T0 - t * (SPAWN_T0 - SPAWN_TMIN);
-
-    // Spawn
+    // Spawn interval tightens with speed
+    const speedT = (speed - BASE_SPD) / (MAX_SPD - BASE_SPD);
+    spawnIv = SPAWN_T0 - speedT * (SPAWN_T0 - SPAWN_TMIN);
     spawnTimer += dt;
-    if (spawnTimer >= spawnIv) {
-      spawnObs();
-      spawnTimer = 0;
-    }
+    if (spawnTimer >= spawnIv) { spawnObs(); spawnTimer = 0; }
 
-    // Scroll track (all five mesh arrays)
+    // Scroll track
     scrollTrack(dt, speed);
 
     // Move & cull obstacles
@@ -586,7 +789,7 @@ engine.runRenderLoop(() => {
       if (m.position.z < DESPAWN_Z) despawnObs(m);
     }
 
-    // Lane-switch — ease-in-out cubic tween over LANE_DUR seconds
+    // Lane switch tween (ease-in-out cubic, 130ms)
     if (laneTween.p < 1) {
       laneTween.p = Math.min(1, laneTween.p + dt / LANE_DUR);
       pPos.x = laneTween.fromX +
@@ -594,7 +797,7 @@ engine.runRenderLoop(() => {
       if (laneTween.p === 1) lane.cur = lane.tgt;
     }
 
-    // Jump physics — lighter gravity on rise, heavier on fall (weighty arc)
+    // Jump physics (split gravity: lighter rise, heavier fall)
     if (jumping) {
       const g = velY > 0 ? GRAV_RISE : GRAV_FALL;
       velY   += g * dt;
@@ -603,24 +806,92 @@ engine.runRenderLoop(() => {
         pPos.y  = GROUND_Y;
         velY    = 0;
         jumping = false;
+        squashT = SQUASH_DUR * 0.55;  // lighter squash on natural landing
+        burstDust(pPos.x);
       }
     }
 
-    // Running bob (only while on ground)
+    // Squash/stretch animation (slam = full, natural landing = softer)
     bobT += dt;
-    const bob = jumping ? 0 : Math.sin(bobT * 10) * 0.034;
+    if (squashT > 0) {
+      squashT    -= dt;
+      const p     = Math.max(0, squashT / SQUASH_DUR);
+      const sy    = 1 - p * 0.42;
+      const sx    = 1 + p * 0.24;
+      pBody.scaling.set(sx, sy, sx);
+      pLeaf.scaling.set(0.72 * sx, 0.32 * sy, 0.9 * sx);
+      pStem.scaling.set(sx, sy, sx);
+    } else {
+      pBody.scaling.set(1, 1, 1);
+      pLeaf.scaling.set(0.72, 0.32, 0.9);
+      pStem.scaling.set(1, 1, 1);
+    }
 
-    // Update player mesh positions
+    // Running bob (suppressed during squash to avoid fighting animations)
+    const bob = (jumping || squashT > 0) ? 0 : Math.sin(bobT * 10) * 0.034;
     pBody.position.set(pPos.x, pPos.y + bob, 0);
     pLeaf.position.set(pPos.x, pPos.y + 0.60 + bob, 0.04);
     pStem.position.set(pPos.x, pPos.y + 0.82 + bob, 0.04);
 
-    // Camera follows player X smoothly
+    // Camera follows player X
     camera.position.x += (pPos.x - camera.position.x) * Math.min(1, 7 * dt);
-    camera.setTarget(new BABYLON.Vector3(camera.position.x * 0.25, 1.2, 22));
+    camera.setTarget(new BABYLON.Vector3(camera.position.x * 0.25, 0.8, 20));
 
-    // Collision
-    if (checkCollision()) triggerGameOver();
+    // ---- Chaser: retreats while player runs clean ----
+    chaser.dist = Math.min(CHASER_MAX, chaser.dist + CHASER_RETREAT * dt);
+
+    // ---- Collision resolution ----
+    const hit = checkCollisions();
+    if (hit === 'HIT') {
+      triggerGameOver();
+    } else if (hit === 'GRAZE') {
+      if (chaser.grazes >= 1) {
+        // Second graze — caught
+        triggerGameOver();
+      } else {
+        // First graze — monster surges, one life remaining
+        chaser.grazes++;
+        chaser.dist = Math.max(2, chaser.dist - CHASER_SURGE1);
+      }
+    }
+
+    // ---- The Muncher: 3D position + animation ----
+    // Camera is at z=-11; Muncher moves from z≈-9.5 (invisible) to z≈-4 (very visible).
+    // The higher-placed camera means the top of the Muncher (eyes at y≈3.9)
+    // becomes visible at the bottom of the screen as it closes in.
+    const dangerT  = Math.max(0, 1 - chaser.dist / CHASER_MAX);
+    const mZ       = -(9.5 - dangerT * 5.5);
+    muncher.position.set(camera.position.x * 0.3, 0, mZ);
+
+    // Jaw animation: chomps faster and wider under pressure
+    muncherT += dt;
+    const jawSpeed = 2.8 + dangerT * 9;
+    const jawAmp   = 0.10 + dangerT * 0.30;
+    const jawAng   = Math.abs(Math.sin(muncherT * jawSpeed)) * jawAmp;
+    mJawU.position.y = 2.88 + jawAng * 1.3;
+    mJawL.position.y = 1.94 - jawAng * 0.9;
+    mMouth.position.y = 2.4 + jawAng * 0.2;
+
+    // Eyes track the player
+    const eyeFollow = pPos.x * 0.09;
+    mEyeL.position.x  = -0.98 + eyeFollow;
+    mEyeR.position.x  =  0.98 + eyeFollow;
+    mPupilL.position.x = -0.98 + eyeFollow;
+    mPupilR.position.x =  0.98 + eyeFollow;
+
+    // Body emissive pulses purple-red with danger
+    matMBody.emissiveColor.set(
+      0.05 + dangerT * 0.24,
+      0.02,
+      0.10 + dangerT * 0.14
+    );
+
+    // Danger overlay: bottom-of-screen red vignette.
+    // Only kicks in meaningfully when chaser is at 70% of max distance or closer.
+    const dangerOpacity = Math.pow(Math.max(0, 1 - chaser.dist / (CHASER_MAX * 0.7)), 2.0);
+    setDanger(dangerOpacity);
+
+    if (chaser.dist <= 0) triggerGameOver();
   }
 
   scene.render();
