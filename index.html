@@ -234,17 +234,18 @@ const WRAP_Q     = TILE_N * TILE_D;   // wrap quantum (128 units)
 const SPAWN_Z    = 62;
 const DESPAWN_Z  = -14;
 
-const BASE_SPD   = 14;    // units/s
-const MAX_SPD    = 32;
-const ACCEL      = 0.55;  // units/s²
-const JUMP_V     = 10.5;
-const GRAV       = -24;
+const BASE_SPD   = 12;    // comfortable starting speed
+const MAX_SPD    = 30;    // genuinely intense ceiling
+const ACCEL      = 0.28;  // units/s² — takes ~65s to reach max (earned)
+const JUMP_V     = 13.5;  // initial upward velocity
+const GRAV_RISE  = -20;   // gentler gravity on the way up — clean arc, some hang
+const GRAV_FALL  = -34;   // heavier gravity on the way down — weighty, satisfying
 const GROUND_Y   = 0.55;
+const LANE_DUR   = 0.13;  // 130ms lane-switch duration
 
 const POOL_SZ    = 14;
-const SPAWN_T0   = 2.2;   // seconds at start
-const SPAWN_TMIN = 0.82;
-const LANE_LERP  = 13;    // lateral smoothing
+const SPAWN_T0   = 2.5;   // generous at game start
+const SPAWN_TMIN = 0.85;
 
 // ---- Camera --------------------------------------------------------
 const camera = new BABYLON.FreeCamera('cam',
@@ -382,6 +383,10 @@ const pPos  = { x: LANE_X[1], y: GROUND_Y };
 let velY    = 0;
 let jumping = false;
 
+// Lane-switch tween (ease-in-out cubic over LANE_DUR seconds)
+const laneTween = { fromX: LANE_X[1], toX: LANE_X[1], p: 1.0 };
+const easeInOut = t => t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t;
+
 function placePlayer() {
   pBody.position.set(pPos.x, pPos.y, 0);
   pLeaf.position.set(pPos.x, pPos.y + 0.60, 0.04);
@@ -394,6 +399,9 @@ function resetPlayer() {
   pPos.y   = GROUND_Y;
   velY     = 0;
   jumping  = false;
+  laneTween.fromX = LANE_X[1];
+  laneTween.toX   = LANE_X[1];
+  laneTween.p     = 1;
   placePlayer();
 }
 resetPlayer();
@@ -453,9 +461,21 @@ function checkCollision() {
 // ---- Input ---------------------------------------------------------
 let tx0 = 0, ty0 = 0;
 
-function doLeft()  { if (gs === 'PLAY' && lane.tgt > 0) lane.tgt--; }
-function doRight() { if (gs === 'PLAY' && lane.tgt < 2) lane.tgt++; }
-function doJump()  {
+function doLeft() {
+  if (gs !== 'PLAY' || lane.tgt <= 0) return;
+  lane.tgt--;
+  laneTween.fromX = pPos.x;
+  laneTween.toX   = LANE_X[lane.tgt];
+  laneTween.p     = 0;
+}
+function doRight() {
+  if (gs !== 'PLAY' || lane.tgt >= 2) return;
+  lane.tgt++;
+  laneTween.fromX = pPos.x;
+  laneTween.toX   = LANE_X[lane.tgt];
+  laneTween.p     = 0;
+}
+function doJump() {
   if (gs === 'PLAY' && !jumping) { velY = JUMP_V; jumping = true; }
 }
 
@@ -566,17 +586,18 @@ engine.runRenderLoop(() => {
       if (m.position.z < DESPAWN_Z) despawnObs(m);
     }
 
-    // Lane-switch lerp
-    const tgtX = LANE_X[lane.tgt];
-    pPos.x += (tgtX - pPos.x) * Math.min(1, LANE_LERP * dt);
-    if (Math.abs(pPos.x - tgtX) < 0.004) {
-      pPos.x   = tgtX;
-      lane.cur = lane.tgt;
+    // Lane-switch — ease-in-out cubic tween over LANE_DUR seconds
+    if (laneTween.p < 1) {
+      laneTween.p = Math.min(1, laneTween.p + dt / LANE_DUR);
+      pPos.x = laneTween.fromX +
+               (laneTween.toX - laneTween.fromX) * easeInOut(laneTween.p);
+      if (laneTween.p === 1) lane.cur = lane.tgt;
     }
 
-    // Jump physics
+    // Jump physics — lighter gravity on rise, heavier on fall (weighty arc)
     if (jumping) {
-      velY   += GRAV * dt;
+      const g = velY > 0 ? GRAV_RISE : GRAV_FALL;
+      velY   += g * dt;
       pPos.y += velY * dt;
       if (pPos.y <= GROUND_Y) {
         pPos.y  = GROUND_Y;
