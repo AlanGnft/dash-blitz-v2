@@ -2,94 +2,610 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dash Blitz V2 — Coming Soon</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Dash Blitz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-    body {
-      background-color: #0d0d0d;
-      color: #f0f0f0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0d0d0d;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    #renderCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%; height: 100%;
+      display: block;
+      touch-action: none;
+    }
+
+    /* ---- HUD ---- */
+    #hud {
+      position: fixed;
+      top: 18px; right: 22px;
+      display: none;
+      flex-direction: column;
+      align-items: flex-end;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #hud .label {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: #555;
+      text-transform: uppercase;
+    }
+    #scoreDisplay {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(28px, 5vw, 40px);
+      color: #F5B800;
+      line-height: 1;
+      text-shadow: 0 0 18px rgba(245,184,0,0.5);
+    }
+
+    /* ---- Overlays ---- */
+    .overlay {
+      position: fixed;
+      inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
+      z-index: 20;
+    }
+    .overlay.hidden { display: none; }
+
+    .overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 60%,
+        rgba(232,32,26,0.09) 0%,
+        rgba(13,13,13,0.88) 55%,
+        rgba(13,13,13,0.96) 100%);
+      z-index: -1;
     }
 
-    .container {
-      text-align: center;
-      padding: 2rem;
-    }
-
-    .logo-text {
-      font-size: clamp(2.5rem, 8vw, 5rem);
-      font-weight: 900;
-      letter-spacing: -0.02em;
+    /* ---- Logo ---- */
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(64px, 16vw, 130px);
+      letter-spacing: 6px;
       line-height: 1;
-      background: linear-gradient(135deg, #e8000d 0%, #ffcc00 60%, #e8000d 100%);
+      background: linear-gradient(145deg, #E8201A 0%, #F5B800 55%, #E8201A 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      text-transform: uppercase;
+      filter: drop-shadow(0 0 28px rgba(232,32,26,0.42));
     }
 
-    .v2-badge {
-      display: inline-block;
-      margin-top: 0.6rem;
-      font-size: clamp(0.75rem, 2vw, 1rem);
+    /* ---- Decorative line ---- */
+    .deco {
+      width: clamp(160px, 36vw, 320px);
+      height: 1.5px;
+      background: linear-gradient(90deg,
+        transparent, #E8201A 30%, #F5B800 50%, #E8201A 70%, transparent);
+      margin: 18px 0 26px;
+    }
+
+    /* ---- Tap prompt ---- */
+    .tap-prompt {
+      font-family: 'Rajdhani', sans-serif;
       font-weight: 700;
-      letter-spacing: 0.25em;
+      font-size: clamp(14px, 3vw, 20px);
+      letter-spacing: 5px;
       text-transform: uppercase;
-      color: #ffcc00;
-      border: 2px solid #ffcc00;
-      padding: 0.25rem 0.9rem;
+      color: #ccc;
+      animation: blink 1.3s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.22; }
+    }
+
+    /* ---- Controls hint ---- */
+    .hint {
+      margin-top: 30px;
+      font-size: clamp(11px, 1.8vw, 13px);
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: #3a3a3a;
+      text-align: center;
+      line-height: 2;
+      text-transform: uppercase;
+    }
+    .hint span { color: #555; }
+
+    /* ---- Game Over ---- */
+    .gameover-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(52px, 13vw, 100px);
+      letter-spacing: 4px;
+      color: #E8201A;
+      filter: drop-shadow(0 0 22px rgba(232,32,26,0.6));
+      line-height: 1;
+    }
+    .score-label {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: clamp(11px, 2vw, 15px);
+      font-weight: 600;
+      letter-spacing: 4px;
+      color: #444;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .final-score {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(40px, 10vw, 78px);
+      color: #F5B800;
+      line-height: 1;
+      filter: drop-shadow(0 0 14px rgba(245,184,0,0.48));
+    }
+
+    .play-btn {
+      margin-top: 38px;
+      padding: 13px 56px;
+      background: linear-gradient(150deg, #E8201A, #b81410);
+      color: #fff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 5px;
+      border: none;
       border-radius: 3px;
+      cursor: pointer;
+      box-shadow: 0 4px 28px rgba(232,32,26,0.42),
+                  inset 0 1px 0 rgba(255,255,255,0.12);
+      transition: transform 0.08s, box-shadow 0.08s;
     }
-
-    .divider {
-      width: 60px;
-      height: 3px;
-      background: linear-gradient(90deg, #e8000d, #ffcc00);
-      margin: 2rem auto;
-      border-radius: 2px;
+    .play-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 7px 38px rgba(232,32,26,0.62),
+                  inset 0 1px 0 rgba(255,255,255,0.12);
     }
-
-    .coming-soon {
-      font-size: clamp(0.85rem, 2.5vw, 1.1rem);
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: #888;
-    }
-
-    /* subtle animated glow behind the title */
-    .glow {
-      position: absolute;
-      width: 500px;
-      height: 500px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(232,0,13,0.12) 0%, transparent 70%);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-      animation: pulse 4s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
-      50%       { opacity: 1;   transform: translate(-50%, -50%) scale(1.15); }
-    }
+    .play-btn:active { transform: scale(0.96); }
   </style>
 </head>
 <body>
-  <div class="glow"></div>
-  <div class="container">
-    <div class="logo-text">Dash Blitz</div>
-    <div class="v2-badge">Version 2</div>
-    <div class="divider"></div>
-    <div class="coming-soon">Coming Soon</div>
+
+<canvas id="renderCanvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="label">Score</div>
+  <div id="scoreDisplay">0</div>
+</div>
+
+<!-- Start Screen -->
+<div id="startScreen" class="overlay">
+  <div class="logo">DASH BLITZ</div>
+  <div class="deco"></div>
+  <div class="tap-prompt">Tap to Play</div>
+  <div class="hint">
+    <span>← →</span> Switch lanes &nbsp;&nbsp; <span>↑ / Space</span> Jump<br>
+    Swipe left / right / up on mobile
   </div>
+</div>
+
+<!-- Game Over Screen -->
+<div id="gameOverScreen" class="overlay hidden">
+  <div class="gameover-title">Game Over</div>
+  <div class="deco"></div>
+  <div class="score-label">Final Score</div>
+  <div class="final-score" id="finalScore">0</div>
+  <button class="play-btn" id="playAgainBtn">Play Again</button>
+</div>
+
+<!-- Babylon.js 7.x -->
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+
+<script type="module">
+// ================================================================
+//  DASH BLITZ  —  Core Game Engine  (Phase 1)
+//  Single-file static build for GitHub Pages
+//  Backend: Supabase (Phase 2+) — auth, leaderboard, user data
+// ================================================================
+
+// ---- Engine & Scene ------------------------------------------------
+const canvas = document.getElementById('renderCanvas');
+const engine = new BABYLON.Engine(canvas, true, {
+  preserveDrawingBuffer: false,
+  stencil: false,
+  powerPreference: 'high-performance'
+});
+const scene = new BABYLON.Scene(engine);
+scene.clearColor = new BABYLON.Color4(0.051, 0.051, 0.055, 1);
+scene.fogMode    = BABYLON.Scene.FOGMODE_EXP2;
+scene.fogColor   = new BABYLON.Color3(0.05, 0.05, 0.055);
+scene.fogDensity = 0.022;
+
+// ---- Config --------------------------------------------------------
+const LANE_X     = [-2.2, 0, 2.2];   // world X per lane
+const TRACK_W    = 7.2;
+const TILE_D     = 8;                 // depth per ground tile
+const TILE_N     = 16;                // number of looping tiles
+const WRAP_Q     = TILE_N * TILE_D;   // wrap quantum (128 units)
+const SPAWN_Z    = 62;
+const DESPAWN_Z  = -14;
+
+const BASE_SPD   = 14;    // units/s
+const MAX_SPD    = 32;
+const ACCEL      = 0.55;  // units/s²
+const JUMP_V     = 10.5;
+const GRAV       = -24;
+const GROUND_Y   = 0.55;
+
+const POOL_SZ    = 14;
+const SPAWN_T0   = 2.2;   // seconds at start
+const SPAWN_TMIN = 0.82;
+const LANE_LERP  = 13;    // lateral smoothing
+
+// ---- Camera --------------------------------------------------------
+const camera = new BABYLON.FreeCamera('cam',
+  new BABYLON.Vector3(0, 5.8, -10), scene);
+camera.setTarget(new BABYLON.Vector3(0, 1.2, 22));
+camera.minZ = 0.1;
+camera.maxZ = 200;
+
+// ---- Lighting ------------------------------------------------------
+const hemi = new BABYLON.HemisphericLight('hemi',
+  new BABYLON.Vector3(0, 1, 0), scene);
+hemi.intensity   = 0.28;
+hemi.diffuse     = new BABYLON.Color3(0.7, 0.7, 0.85);
+hemi.groundColor = new BABYLON.Color3(0.04, 0.04, 0.06);
+
+const sun = new BABYLON.DirectionalLight('sun',
+  new BABYLON.Vector3(-0.25, -1, 0.6), scene);
+sun.intensity = 1.3;
+sun.diffuse   = new BABYLON.Color3(1, 0.94, 0.88);
+
+const rimLight = new BABYLON.PointLight('rim',
+  new BABYLON.Vector3(0, 2.5, -8), scene);
+rimLight.diffuse   = new BABYLON.Color3(0.95, 0.08, 0.04);
+rimLight.intensity = 1.8;
+rimLight.range     = 22;
+
+// ---- Materials -----------------------------------------------------
+const matTrack = new BABYLON.StandardMaterial('track', scene);
+matTrack.diffuseColor  = new BABYLON.Color3(0.065, 0.065, 0.075);
+matTrack.specularColor = new BABYLON.Color3(0.04, 0.04, 0.06);
+
+const matEdge = new BABYLON.StandardMaterial('edge', scene);
+matEdge.diffuseColor  = new BABYLON.Color3(0.9, 0.08, 0.04);
+matEdge.emissiveColor = new BABYLON.Color3(0.68, 0.04, 0.02);
+
+const matDiv = new BABYLON.StandardMaterial('div', scene);
+matDiv.diffuseColor  = new BABYLON.Color3(0.14, 0.14, 0.18);
+matDiv.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.08);
+
+const matApple = new BABYLON.PBRMaterial('apple', scene);
+matApple.albedoColor          = new BABYLON.Color3(0.92, 0.11, 0.07);
+matApple.metallic             = 0.05;
+matApple.roughness            = 0.12;
+matApple.environmentIntensity = 0.35;
+
+const matLeaf = new BABYLON.PBRMaterial('leaf', scene);
+matLeaf.albedoColor = new BABYLON.Color3(0.08, 0.78, 0.14);
+matLeaf.metallic    = 0.0;
+matLeaf.roughness   = 0.18;
+
+const matStem = new BABYLON.StandardMaterial('stem', scene);
+matStem.diffuseColor = new BABYLON.Color3(0.22, 0.48, 0.08);
+
+const matObs = new BABYLON.PBRMaterial('obs', scene);
+matObs.albedoColor          = new BABYLON.Color3(0.38, 0.38, 0.42);
+matObs.metallic             = 0.55;
+matObs.roughness            = 0.62;
+matObs.environmentIntensity = 0.2;
+
+// ---- Track ---------------------------------------------------------
+// Five arrays of TILE_N meshes each; all scroll at game speed.
+const gTiles = [], gEdgeL = [], gEdgeR = [], gDivL = [], gDivR = [];
+
+for (let i = 0; i < TILE_N; i++) {
+  const z = i * TILE_D;
+
+  const tile = BABYLON.MeshBuilder.CreateBox('gt' + i,
+    { width: TRACK_W, height: 0.14, depth: TILE_D }, scene);
+  tile.material = matTrack;
+  tile.position.set(0, -0.07, z);
+  gTiles.push(tile);
+
+  const el = BABYLON.MeshBuilder.CreateBox('el' + i,
+    { width: 0.11, height: 0.13, depth: TILE_D }, scene);
+  el.material = matEdge;
+  el.position.set(-(TRACK_W / 2 - 0.06), 0.01, z);
+  gEdgeL.push(el);
+
+  const er = BABYLON.MeshBuilder.CreateBox('er' + i,
+    { width: 0.11, height: 0.13, depth: TILE_D }, scene);
+  er.material = matEdge;
+  er.position.set(TRACK_W / 2 - 0.06, 0.01, z);
+  gEdgeR.push(er);
+
+  const dl = BABYLON.MeshBuilder.CreateBox('dl' + i,
+    { width: 0.055, height: 0.09, depth: TILE_D }, scene);
+  dl.material = matDiv;
+  dl.position.set(-1.1, 0.01, z);
+  gDivL.push(dl);
+
+  const dr = BABYLON.MeshBuilder.CreateBox('dr' + i,
+    { width: 0.055, height: 0.09, depth: TILE_D }, scene);
+  dr.material = matDiv;
+  dr.position.set(1.1, 0.01, z);
+  gDivR.push(dr);
+}
+
+const allTrack = [...gTiles, ...gEdgeL, ...gEdgeR, ...gDivL, ...gDivR];
+
+function scrollTrack(dt, spd) {
+  for (const m of allTrack) {
+    m.position.z -= spd * dt;
+    if (m.position.z < DESPAWN_Z) m.position.z += WRAP_Q;
+  }
+}
+
+function resetTrack() {
+  for (let i = 0; i < TILE_N; i++) {
+    const z = i * TILE_D;
+    gTiles[i].position.z = z;
+    gEdgeL[i].position.z = z;
+    gEdgeR[i].position.z = z;
+    gDivL[i].position.z  = z;
+    gDivR[i].position.z  = z;
+  }
+}
+
+// ---- Player (the Apple) --------------------------------------------
+const pBody = BABYLON.MeshBuilder.CreateSphere('apple',
+  { diameter: 1.1, segments: 20 }, scene);
+pBody.material = matApple;
+
+const pLeaf = BABYLON.MeshBuilder.CreateSphere('leaf',
+  { diameter: 0.52, segments: 10 }, scene);
+pLeaf.material  = matLeaf;
+pLeaf.scaling.set(0.72, 0.32, 0.9);
+
+const pStem = BABYLON.MeshBuilder.CreateCylinder('stem',
+  { diameter: 0.065, height: 0.28, tessellation: 6 }, scene);
+pStem.material = matStem;
+
+// Player state
+const lane  = { cur: 1, tgt: 1 };
+const pPos  = { x: LANE_X[1], y: GROUND_Y };
+let velY    = 0;
+let jumping = false;
+
+function placePlayer() {
+  pBody.position.set(pPos.x, pPos.y, 0);
+  pLeaf.position.set(pPos.x, pPos.y + 0.60, 0.04);
+  pStem.position.set(pPos.x, pPos.y + 0.82, 0.04);
+}
+
+function resetPlayer() {
+  lane.cur = 1; lane.tgt = 1;
+  pPos.x   = LANE_X[1];
+  pPos.y   = GROUND_Y;
+  velY     = 0;
+  jumping  = false;
+  placePlayer();
+}
+resetPlayer();
+
+// ---- Obstacle Pool -------------------------------------------------
+// One invisible template; all pool members are instances of it.
+const obsTpl = BABYLON.MeshBuilder.CreateBox('obs_tpl',
+  { width: 1.0, height: 1.1, depth: 1.0 }, scene);
+obsTpl.material  = matObs;
+obsTpl.isVisible = false;
+
+const obsPool   = [];
+const obsActive = [];
+
+for (let i = 0; i < POOL_SZ; i++) {
+  const inst      = obsTpl.createInstance('obs_' + i);
+  inst.isVisible  = false;
+  inst._active    = false;
+  obsPool.push(inst);
+}
+
+function spawnObs() {
+  const m = obsPool.find(o => !o._active);
+  if (!m) return;
+  const l     = Math.floor(Math.random() * 3);
+  m.position.set(LANE_X[l], 0.55, SPAWN_Z);
+  m.isVisible = true;
+  m._active   = true;
+  obsActive.push(m);
+}
+
+function despawnObs(m) {
+  m.isVisible  = false;
+  m._active    = false;
+  m.position.z = SPAWN_Z + 200;
+  const i = obsActive.indexOf(m);
+  if (i >= 0) obsActive.splice(i, 1);
+}
+
+function clearObs() {
+  while (obsActive.length) despawnObs(obsActive[0]);
+}
+
+// ---- Collision (AABB) ----------------------------------------------
+function checkCollision() {
+  const { x: px, y: py } = pPos;
+  for (const m of obsActive) {
+    if (Math.abs(px - m.position.x) < 0.70 &&
+        Math.abs(py - m.position.y) < 0.78 &&
+        Math.abs(      m.position.z) < 0.70) {  // player is always at z=0
+      return true;
+    }
+  }
+  return false;
+}
+
+// ---- Input ---------------------------------------------------------
+let tx0 = 0, ty0 = 0;
+
+function doLeft()  { if (gs === 'PLAY' && lane.tgt > 0) lane.tgt--; }
+function doRight() { if (gs === 'PLAY' && lane.tgt < 2) lane.tgt++; }
+function doJump()  {
+  if (gs === 'PLAY' && !jumping) { velY = JUMP_V; jumping = true; }
+}
+
+window.addEventListener('keydown', e => {
+  switch (e.key) {
+    case 'ArrowLeft':  case 'a': case 'A': doLeft();  break;
+    case 'ArrowRight': case 'd': case 'D': doRight(); break;
+    case 'ArrowUp':    case 'w': case 'W': case ' ':  doJump(); break;
+  }
+});
+
+canvas.addEventListener('touchstart', e => {
+  tx0 = e.touches[0].clientX;
+  ty0 = e.touches[0].clientY;
+  if (gs === 'START') startGame();
+}, { passive: true });
+
+canvas.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tx0;
+  const dy = e.changedTouches[0].clientY - ty0;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (Math.abs(dx) > 28) dx > 0 ? doRight() : doLeft();
+  } else {
+    if (dy < -28) doJump();
+  }
+}, { passive: true });
+
+// ---- UI helpers ----------------------------------------------------
+const hudEl       = document.getElementById('hud');
+const scoreEl     = document.getElementById('scoreDisplay');
+const finalScEl   = document.getElementById('finalScore');
+const startScr    = document.getElementById('startScreen');
+const gameOverScr = document.getElementById('gameOverScreen');
+
+document.getElementById('startScreen').addEventListener('click',  startGame);
+document.getElementById('playAgainBtn').addEventListener('click', startGame);
+
+function showHUD()    { hudEl.style.display = 'flex'; }
+function hideHUD()    { hudEl.style.display = 'none';  }
+function updateScore(s) { scoreEl.textContent = Math.floor(s); }
+
+// ---- Game state ----------------------------------------------------
+let gs         = 'START';  // START | PLAY | DEAD
+let score      = 0;
+let speed      = BASE_SPD;
+let spawnTimer = 0;
+let spawnIv    = SPAWN_T0;
+let bobT       = 0;
+
+function startGame() {
+  score      = 0;
+  speed      = BASE_SPD;
+  spawnTimer = 0;
+  spawnIv    = SPAWN_T0;
+  bobT       = 0;
+
+  resetPlayer();
+  clearObs();
+  resetTrack();
+
+  startScr.classList.add('hidden');
+  gameOverScr.classList.add('hidden');
+  showHUD();
+  updateScore(0);
+
+  gs = 'PLAY';
+}
+
+function triggerGameOver() {
+  gs = 'DEAD';
+  hideHUD();
+  finalScEl.textContent = Math.floor(score);
+  gameOverScr.classList.remove('hidden');
+}
+
+// ---- Game loop -----------------------------------------------------
+engine.runRenderLoop(() => {
+  // Cap dt to 50 ms to prevent tunneling on tab-switch resume
+  const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
+
+  if (gs === 'PLAY') {
+
+    // Speed ramp
+    speed = Math.min(speed + ACCEL * dt, MAX_SPD);
+
+    // Score: proportional to distance travelled
+    score += speed * dt * 0.5;
+    updateScore(score);
+
+    // Shrink spawn interval as speed grows
+    const t = (speed - BASE_SPD) / (MAX_SPD - BASE_SPD);
+    spawnIv = SPAWN_T0 - t * (SPAWN_T0 - SPAWN_TMIN);
+
+    // Spawn
+    spawnTimer += dt;
+    if (spawnTimer >= spawnIv) {
+      spawnObs();
+      spawnTimer = 0;
+    }
+
+    // Scroll track (all five mesh arrays)
+    scrollTrack(dt, speed);
+
+    // Move & cull obstacles
+    for (let i = obsActive.length - 1; i >= 0; i--) {
+      const m = obsActive[i];
+      m.position.z -= speed * dt;
+      if (m.position.z < DESPAWN_Z) despawnObs(m);
+    }
+
+    // Lane-switch lerp
+    const tgtX = LANE_X[lane.tgt];
+    pPos.x += (tgtX - pPos.x) * Math.min(1, LANE_LERP * dt);
+    if (Math.abs(pPos.x - tgtX) < 0.004) {
+      pPos.x   = tgtX;
+      lane.cur = lane.tgt;
+    }
+
+    // Jump physics
+    if (jumping) {
+      velY   += GRAV * dt;
+      pPos.y += velY * dt;
+      if (pPos.y <= GROUND_Y) {
+        pPos.y  = GROUND_Y;
+        velY    = 0;
+        jumping = false;
+      }
+    }
+
+    // Running bob (only while on ground)
+    bobT += dt;
+    const bob = jumping ? 0 : Math.sin(bobT * 10) * 0.034;
+
+    // Update player mesh positions
+    pBody.position.set(pPos.x, pPos.y + bob, 0);
+    pLeaf.position.set(pPos.x, pPos.y + 0.60 + bob, 0.04);
+    pStem.position.set(pPos.x, pPos.y + 0.82 + bob, 0.04);
+
+    // Camera follows player X smoothly
+    camera.position.x += (pPos.x - camera.position.x) * Math.min(1, 7 * dt);
+    camera.setTarget(new BABYLON.Vector3(camera.position.x * 0.25, 1.2, 22));
+
+    // Collision
+    if (checkCollision()) triggerGameOver();
+  }
+
+  scene.render();
+});
+
+window.addEventListener('resize', () => engine.resize());
+</script>
 </body>
 </html>
