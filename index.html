@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dash Blitz V2 — Coming Soon</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: #0d0d0d;
+      color: #f0f0f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .container {
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .logo-text {
+      font-size: clamp(2.5rem, 8vw, 5rem);
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      background: linear-gradient(135deg, #e8000d 0%, #ffcc00 60%, #e8000d 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-transform: uppercase;
+    }
+
+    .v2-badge {
+      display: inline-block;
+      margin-top: 0.6rem;
+      font-size: clamp(0.75rem, 2vw, 1rem);
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #ffcc00;
+      border: 2px solid #ffcc00;
+      padding: 0.25rem 0.9rem;
+      border-radius: 3px;
+    }
+
+    .divider {
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, #e8000d, #ffcc00);
+      margin: 2rem auto;
+      border-radius: 2px;
+    }
+
+    .coming-soon {
+      font-size: clamp(0.85rem, 2.5vw, 1.1rem);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #888;
+    }
+
+    /* subtle animated glow behind the title */
+    .glow {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(232,0,13,0.12) 0%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      animation: pulse 4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+      50%       { opacity: 1;   transform: translate(-50%, -50%) scale(1.15); }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="container">
+    <div class="logo-text">Dash Blitz</div>
+    <div class="v2-badge">Version 2</div>
+    <div class="divider"></div>
+    <div class="coming-soon">Coming Soon</div>
+  </div>
+</body>
+</html>
