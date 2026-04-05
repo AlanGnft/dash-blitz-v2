@@ -384,11 +384,33 @@ matLeaf.roughness   = 0.18;
 const matStem = new BABYLON.StandardMaterial('stem', scene);
 matStem.diffuseColor = new BABYLON.Color3(0.22, 0.48, 0.08);
 
-const matObs = new BABYLON.PBRMaterial('obs', scene);
-matObs.albedoColor          = new BABYLON.Color3(0.38, 0.38, 0.42);
-matObs.metallic             = 0.55;
-matObs.roughness            = 0.62;
-matObs.environmentIntensity = 0.2;
+// Obstacle materials — themed
+const matCan = new BABYLON.PBRMaterial('can', scene);
+matCan.albedoColor          = new BABYLON.Color3(0.82, 0.08, 0.06);
+matCan.metallic             = 0.72;
+matCan.roughness            = 0.28;
+matCan.environmentIntensity = 0.3;
+
+const matCanCap = new BABYLON.PBRMaterial('canCap', scene);
+matCanCap.albedoColor          = new BABYLON.Color3(0.72, 0.72, 0.76);
+matCanCap.metallic             = 0.85;
+matCanCap.roughness            = 0.22;
+matCanCap.environmentIntensity = 0.3;
+
+const matCrate = new BABYLON.PBRMaterial('crate', scene);
+matCrate.albedoColor          = new BABYLON.Color3(0.44, 0.28, 0.12);
+matCrate.metallic             = 0.0;
+matCrate.roughness            = 0.88;
+matCrate.environmentIntensity = 0.15;
+
+const matCart = new BABYLON.PBRMaterial('cart', scene);
+matCart.albedoColor          = new BABYLON.Color3(0.40, 0.40, 0.44);
+matCart.metallic             = 0.70;
+matCart.roughness             = 0.40;
+matCart.environmentIntensity = 0.25;
+
+// Keep legacy matObs (unused after pool replacement, kept to avoid errors)
+const matObs = matCan;
 
 // ---- Track ---------------------------------------------------------
 const gTiles = [], gEdgeL = [], gEdgeR = [], gDivL = [], gDivR = [];
@@ -568,35 +590,108 @@ function burstDust(x) {
   dustPS.start();
 }
 
-// ---- Obstacle Pool -------------------------------------------------
-const obsTpl = BABYLON.MeshBuilder.CreateBox('obs_tpl',
-  { width: 1.0, height: 1.1, depth: 1.0 }, scene);
-obsTpl.material  = matObs;
-obsTpl.isVisible = false;
+// ---- Obstacle Pool — 3 themed types --------------------------------
+// Each obstacle is a TransformNode root with child meshes.
+// _halfW: collision half-width (X). _type: 'can'|'crate'|'cart'
 
+function makeCanObs(idx) {
+  const root = new BABYLON.TransformNode('obs_can_' + idx, scene);
+  const body = BABYLON.MeshBuilder.CreateCylinder('canBody_' + idx,
+    { diameter: 0.70, height: 1.20, tessellation: 16 }, scene);
+  body.material = matCan;
+  body.position.y = 0.60;
+  body.parent = root;
+  const cap = BABYLON.MeshBuilder.CreateCylinder('canCap_' + idx,
+    { diameter: 0.62, height: 0.10, tessellation: 16 }, scene);
+  cap.material = matCanCap;
+  cap.position.y = 1.25;
+  cap.parent = root;
+  root._meshes = [body, cap];
+  root._halfW  = 0.38;
+  root._type   = 'can';
+  return root;
+}
+
+function makeCrateObs(idx) {
+  const root = new BABYLON.TransformNode('obs_crate_' + idx, scene);
+  const bot = BABYLON.MeshBuilder.CreateBox('crateBot_' + idx,
+    { width: 1.0, height: 0.80, depth: 1.0 }, scene);
+  bot.material = matCrate;
+  bot.position.y = 0.40;
+  bot.parent = root;
+  const top = BABYLON.MeshBuilder.CreateBox('crateTop_' + idx,
+    { width: 0.80, height: 0.80, depth: 0.80 }, scene);
+  top.material = matCrate;
+  top.position.set(0.06, 1.20, -0.05);
+  top.parent = root;
+  root._meshes = [bot, top];
+  root._halfW  = 0.52;
+  root._type   = 'crate';
+  return root;
+}
+
+function makeCartObs(idx) {
+  const root = new BABYLON.TransformNode('obs_cart_' + idx, scene);
+  // Basket frame: back, front, left side, right side, base
+  const parts = [
+    { w:1.20, h:0.70, d:0.06, x:0,     y:0.65, z: 0.46 }, // back
+    { w:1.20, h:0.70, d:0.06, x:0,     y:0.65, z:-0.46 }, // front
+    { w:0.06, h:0.70, d:0.92, x:-0.57, y:0.65, z:0    }, // left
+    { w:0.06, h:0.70, d:0.92, x: 0.57, y:0.65, z:0    }, // right
+    { w:1.20, h:0.06, d:0.92, x:0,     y:0.32, z:0    }, // base
+    // Handle bar across top-back
+    { w:1.20, h:0.07, d:0.07, x:0,     y:1.08, z: 0.40 },
+  ];
+  const meshes = [];
+  for (let k = 0; k < parts.length; k++) {
+    const p  = parts[k];
+    const bx = BABYLON.MeshBuilder.CreateBox('cartP_' + idx + '_' + k,
+      { width: p.w, height: p.h, depth: p.d }, scene);
+    bx.material = matCart;
+    bx.position.set(p.x, p.y, p.z);
+    bx.parent = root;
+    meshes.push(bx);
+  }
+  root._meshes = meshes;
+  root._halfW  = 0.62;
+  root._type   = 'cart';
+  return root;
+}
+
+const OBS_PER_TYPE = 5;
 const obsPool   = [];
 const obsActive = [];
 
-for (let i = 0; i < POOL_SZ; i++) {
-  const inst     = obsTpl.createInstance('obs_' + i);
-  inst.isVisible = false;
-  inst._active   = false;
-  obsPool.push(inst);
+for (let i = 0; i < OBS_PER_TYPE; i++) {
+  const can   = makeCanObs(i);
+  const crate = makeCrateObs(i);
+  const cart  = makeCartObs(i);
+  for (const root of [can, crate, cart]) {
+    root._active = false;
+    root._grazed = false;
+    root.position.set(0, 0, SPAWN_Z + 200);
+    for (const m of root._meshes) m.isVisible = false;
+    obsPool.push(root);
+  }
 }
 
 function spawnObs() {
-  const m = obsPool.find(o => !o._active);
-  if (!m) return;
-  const l    = Math.floor(Math.random() * 3);
-  m.position.set(LANE_X[l], 0.55, SPAWN_Z);
-  m.isVisible = true;
-  m._active   = true;
-  m._grazed   = false;  // reset so this obstacle can register one graze
+  const available = obsPool.filter(o => !o._active);
+  if (!available.length) return;
+  // Pick random type from available
+  const m = available[Math.floor(Math.random() * available.length)];
+  const l = Math.floor(Math.random() * 3);
+  m.position.set(LANE_X[l], 0, SPAWN_Z);
+  // Slight random Y rotation for cans/crates
+  if (m._type !== 'cart') m.rotation.y = (Math.random() - 0.5) * 0.8;
+  for (const mesh of m._meshes) mesh.isVisible = true;
+  m._active = true;
+  m._grazed = false;
   obsActive.push(m);
 }
 
 function despawnObs(m) {
-  m.isVisible  = false;
+  for (const mesh of m._meshes) mesh.isVisible = false;
   m._active    = false;
   m.position.z = SPAWN_Z + 200;
   const i = obsActive.indexOf(m);
@@ -747,11 +842,13 @@ function updateCoinHud()  { coinCountEl.textContent = coinCount; }
 function checkCollisions() {
   const px = pPos.x, py = pPos.y;
   for (const m of obsActive) {
-    const dz = Math.abs(m.position.z);      if (dz > 0.75) continue;
-    const dy = Math.abs(py - m.position.y); if (dy > 0.82) continue;
-    const dx = Math.abs(px - m.position.x);
-    if (dx < 0.62) return 'HIT';
-    if (dx < 0.92 && !m._grazed) { m._grazed = true; return 'GRAZE'; }
+    const dz = Math.abs(m.position.z); if (dz > 0.75) continue;
+    // Y: cans are tall (1.2), crates are taller (1.6 stacked), cart ~1.1
+    const dy = Math.abs(py - 0.55);    if (dy > 0.82) continue;
+    const dx  = Math.abs(px - m.position.x);
+    const hw  = m._halfW || 0.52;
+    if (dx < hw - 0.10) return 'HIT';
+    if (dx < hw + 0.28 && !m._grazed) { m._grazed = true; return 'GRAZE'; }
   }
   return null;
 }
