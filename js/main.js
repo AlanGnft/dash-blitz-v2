@@ -18,7 +18,10 @@ import { initMuncher, resetChaser, updateMuncher, chaser,
          startMuncherSurge, updateMuncherSurge, snapMuncherJawShut, muncherIdleAnim } from './muncher.js';
 import { initAudio, startMusic, stopMusic, playGraze, playDeath,
          playMuncherRoar, playMilestone } from './audio.js';
-import { saveHighScore, getHighScore } from './highscore.js';
+import { saveHighScore, getHighScore, addRunStats,
+         getSavedCharacter, getUnlockedCharacters } from './highscore.js';
+import { CHARACTERS } from './characters/index.js';
+import { setCharacter } from './player.js';
 
 // ---- Engine & Scene ------------------------------------------------
 const canvas = document.getElementById('renderCanvas');
@@ -124,6 +127,17 @@ function resetTrack() {
 // ---- Module init ---------------------------------------------------
 initEffects(scene);
 initPlayer(scene);
+
+// Restore saved character
+(function() {
+  const savedId  = getSavedCharacter();
+  const unlocked = getUnlockedCharacters();
+  if (savedId !== 'apple' && unlocked.includes(savedId)) {
+    const entry = CHARACTERS.find(c => c.id === savedId);
+    if (entry) setCharacter(new entry.Class(scene));
+  }
+})();
+
 initObstacles(scene);
 initCoins(scene);
 initMuncher(scene);
@@ -211,6 +225,7 @@ function triggerDeathSequence() {
 function _finalizeGameOver() {
   hud.setFinalScore(score);
   const { newDistanceRecord, newCoinRecord } = saveHighScore(score, coinCount);
+  addRunStats(score, coinCount);
   const hs = getHighScore();
   hud.setGoStats(score, coinCount, hs.distance, hs.coins, newDistanceRecord, newCoinRecord);
   hud.showGameOver();
