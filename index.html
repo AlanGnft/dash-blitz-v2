@@ -461,6 +461,31 @@ const pStem = BABYLON.MeshBuilder.CreateCylinder('stem',
   { diameter: 0.065, height: 0.28, tessellation: 6 }, scene);
 pStem.material = matStem;
 
+// Apple eyes (face forward = -Z)
+const matEyeWhite = new BABYLON.StandardMaterial('eyeWhite', scene);
+matEyeWhite.diffuseColor  = new BABYLON.Color3(0.95, 0.95, 0.95);
+matEyeWhite.emissiveColor = new BABYLON.Color3(0.18, 0.18, 0.18);
+
+const matEyePupil = new BABYLON.StandardMaterial('eyePupil', scene);
+matEyePupil.diffuseColor  = new BABYLON.Color3(0.06, 0.06, 0.06);
+matEyePupil.emissiveColor = new BABYLON.Color3(0.04, 0.04, 0.04);
+
+const pEyeL = BABYLON.MeshBuilder.CreateSphere('eyeL',
+  { diameter: 0.19, segments: 8 }, scene);
+pEyeL.material = matEyeWhite;
+
+const pEyeR = BABYLON.MeshBuilder.CreateSphere('eyeR',
+  { diameter: 0.19, segments: 8 }, scene);
+pEyeR.material = matEyeWhite;
+
+const pPupilL = BABYLON.MeshBuilder.CreateSphere('pupilL',
+  { diameter: 0.10, segments: 6 }, scene);
+pPupilL.material = matEyePupil;
+
+const pPupilR = BABYLON.MeshBuilder.CreateSphere('pupilR',
+  { diameter: 0.10, segments: 6 }, scene);
+pPupilR.material = matEyePupil;
+
 // Player state
 const lane      = { cur: 1, tgt: 1 };
 const pPos      = { x: LANE_X[1], y: GROUND_Y };
@@ -471,10 +496,22 @@ let squashT     = 0;  // counts down from SQUASH_DUR after landing/slam
 const laneTween = { fromX: LANE_X[1], toX: LANE_X[1], p: 1.0 };
 const easeInOut = t => t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t;
 
+// Lean angles (radians). Z = roll on lane switch, X = pitch on jump.
+const lean = { z: 0, x: 0 };
+const LEAN_LANE_ANG  = 15 * Math.PI / 180;  // 15° roll toward movement dir
+const LEAN_JUMP_UP   =  8 * Math.PI / 180;  // tilt back on rise
+const LEAN_JUMP_DOWN = -6 * Math.PI / 180;  // tilt forward on fall
+const LEAN_RETURN    = 8.0;                  // return speed (rad/s)
+
 function placePlayer() {
   pBody.position.set(pPos.x, pPos.y, 0);
   pLeaf.position.set(pPos.x, pPos.y + 0.60, 0.04);
   pStem.position.set(pPos.x, pPos.y + 0.82, 0.04);
+  // Eyes face forward (-Z). Offset ±0.14 X, +0.10 Y from body center, -0.42 Z (embedded)
+  pEyeL.position.set(pPos.x - 0.14, pPos.y + 0.10, -0.42);
+  pEyeR.position.set(pPos.x + 0.14, pPos.y + 0.10, -0.42);
+  pPupilL.position.set(pPos.x - 0.14, pPos.y + 0.10, -0.48);
+  pPupilR.position.set(pPos.x + 0.14, pPos.y + 0.10, -0.48);
 }
 
 function resetPlayer() {
@@ -490,6 +527,8 @@ function resetPlayer() {
   pBody.scaling.set(1, 1, 1);
   pLeaf.scaling.set(0.72, 0.32, 0.9);
   pStem.scaling.set(1, 1, 1);
+  lean.z = 0; lean.x = 0;
+  pBody.rotation.set(0, 0, 0);
   placePlayer();
 }
 resetPlayer();
@@ -1032,6 +1071,20 @@ engine.runRenderLoop(() => {
       pPos.x = laneTween.fromX +
                (laneTween.toX - laneTween.fromX) * easeInOut(laneTween.p);
       if (laneTween.p === 1) lane.cur = lane.tgt;
+      // Set roll lean toward direction of movement (Z axis = roll in Babylon)
+      const dir = laneTween.toX > laneTween.fromX ? -1 : 1;
+      lean.z = dir * LEAN_LANE_ANG;
+    } else {
+      // Return roll to 0 after switch completes
+      lean.z += (0 - lean.z) * Math.min(1, LEAN_RETURN * dt);
+    }
+
+    // Jump pitch lean (X axis): tilt back on rise, forward on fall
+    if (jumping) {
+      const targetX = velY > 0 ? LEAN_JUMP_UP : LEAN_JUMP_DOWN;
+      lean.x += (targetX - lean.x) * Math.min(1, 12 * dt);
+    } else {
+      lean.x += (0 - lean.x) * Math.min(1, 10 * dt);
     }
 
     // Jump physics (split gravity: lighter rise, heavier fall)
@@ -1067,8 +1120,20 @@ engine.runRenderLoop(() => {
     // Running bob (suppressed during squash to avoid fighting animations)
     const bob = (jumping || squashT > 0) ? 0 : Math.sin(bobT * 10) * 0.034;
     pBody.position.set(pPos.x, pPos.y + bob, 0);
+    pBody.rotation.set(lean.x, 0, lean.z);
     pLeaf.position.set(pPos.x, pPos.y + 0.60 + bob, 0.04);
+    pLeaf.rotation.set(lean.x, 0, lean.z);
     pStem.position.set(pPos.x, pPos.y + 0.82 + bob, 0.04);
+    pStem.rotation.set(lean.x, 0, lean.z);
+    // Eyes track body with bob
+    pEyeL.position.set(pPos.x - 0.14, pPos.y + 0.10 + bob, -0.42);
+    pEyeR.position.set(pPos.x + 0.14, pPos.y + 0.10 + bob, -0.42);
+    pPupilL.position.set(pPos.x - 0.14, pPos.y + 0.10 + bob, -0.48);
+    pPupilR.position.set(pPos.x + 0.14, pPos.y + 0.10 + bob, -0.48);
+    pEyeL.rotation.set(lean.x, 0, lean.z);
+    pEyeR.rotation.set(lean.x, 0, lean.z);
+    pPupilL.rotation.set(lean.x, 0, lean.z);
+    pPupilR.rotation.set(lean.x, 0, lean.z);
 
     // Camera follows player X
     camera.position.x += (pPos.x - camera.position.x) * Math.min(1, 7 * dt);
