@@ -187,21 +187,6 @@ html, body {
   text-shadow: 0 0 14px rgba(245,184,0,0.55);
 }
 
-/* ---- Speed lines (CSS conic starburst, opacity driven by JS) ---- */
-#speed-lines {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 5;
-  opacity: 0;
-  transition: opacity 0.3s;
-  background: repeating-conic-gradient(
-    from 0deg at 50% 50%,
-    rgba(255,255,255,0.06) 0deg,
-    transparent 2deg,
-    transparent 15deg
-  );
-}
 
 /* ---- Graze warning flash (gold edge burst, one-life warning) ---- */
 #grazeFlash {

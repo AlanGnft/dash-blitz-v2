@@ -1,6 +1,5 @@
 // ================================================================
 //  DASH BLITZ — Effects: dust particles, camera shake
-//  Speed lines are CSS-only (see #speed-lines in game.css / index.html)
 // ================================================================
 import { GROUND_Y } from './config.js';
 

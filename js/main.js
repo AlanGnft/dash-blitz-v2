@@ -5,8 +5,6 @@ import { LANE_X, TRACK_W, TILE_D, TILE_N, WRAP_Q,
          SPAWN_Z, DESPAWN_Z, BASE_SPD, MAX_SPD, ACCEL,
          SPAWN_T0, SPAWN_TMIN, CHASER_SURGE1 } from './config.js';
 
-const _speedLinesEl = document.getElementById('speed-lines');
-const SPEED_LINES_THRESH = 0.55;
 import * as hud from './hud.js';
 import { initEffects, burstDust, triggerCamShake, updateEffects } from './effects.js';
 import { initPlayer, resetPlayer, updatePlayer, pPos, ps,
@@ -235,12 +233,6 @@ engine.runRenderLoop(() => {
 
     // Camera shake (sets camera.position.y)
     updateEffects(dt, camera);
-
-    // CSS speed lines — fade in above 55% max speed
-    const ratio = (speed - BASE_SPD) / (MAX_SPD - BASE_SPD);
-    _speedLinesEl.style.opacity = ratio > SPEED_LINES_THRESH
-      ? ((ratio - SPEED_LINES_THRESH) / (1 - SPEED_LINES_THRESH)).toFixed(2)
-      : '0';
 
     camera.setTarget(new BABYLON.Vector3(camera.position.x * 0.25, 0.8, 20));
 
