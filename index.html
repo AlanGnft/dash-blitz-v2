@@ -2,94 +2,1421 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dash Blitz V2 — Coming Soon</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Dash Blitz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-    body {
-      background-color: #0d0d0d;
-      color: #f0f0f0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0d0d0d;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    #renderCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%; height: 100%;
+      display: block;
+      touch-action: none;
+    }
+
+    /* ---- HUD ---- */
+    #hud {
+      position: fixed;
+      top: 18px; right: 22px;
+      display: none;
+      flex-direction: column;
+      align-items: flex-end;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #hud .label {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: #555;
+      text-transform: uppercase;
+    }
+    #scoreDisplay {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(28px, 5vw, 40px);
+      color: #F5B800;
+      line-height: 1;
+      text-shadow: 0 0 18px rgba(245,184,0,0.5);
+    }
+
+    /* ---- Overlays ---- */
+    .overlay {
+      position: fixed;
+      inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
+      z-index: 20;
+    }
+    .overlay.hidden { display: none; }
+
+    .overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 60%,
+        rgba(232,32,26,0.09) 0%,
+        rgba(13,13,13,0.88) 55%,
+        rgba(13,13,13,0.96) 100%);
+      z-index: -1;
     }
 
-    .container {
-      text-align: center;
-      padding: 2rem;
-    }
-
-    .logo-text {
-      font-size: clamp(2.5rem, 8vw, 5rem);
-      font-weight: 900;
-      letter-spacing: -0.02em;
+    /* ---- Logo ---- */
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(64px, 16vw, 130px);
+      letter-spacing: 6px;
       line-height: 1;
-      background: linear-gradient(135deg, #e8000d 0%, #ffcc00 60%, #e8000d 100%);
+      background: linear-gradient(145deg, #E8201A 0%, #F5B800 55%, #E8201A 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      text-transform: uppercase;
+      filter: drop-shadow(0 0 28px rgba(232,32,26,0.42));
     }
 
-    .v2-badge {
-      display: inline-block;
-      margin-top: 0.6rem;
-      font-size: clamp(0.75rem, 2vw, 1rem);
+    /* ---- Decorative line ---- */
+    .deco {
+      width: clamp(160px, 36vw, 320px);
+      height: 1.5px;
+      background: linear-gradient(90deg,
+        transparent, #E8201A 30%, #F5B800 50%, #E8201A 70%, transparent);
+      margin: 18px 0 26px;
+    }
+
+    /* ---- Tap prompt ---- */
+    .tap-prompt {
+      font-family: 'Rajdhani', sans-serif;
       font-weight: 700;
-      letter-spacing: 0.25em;
+      font-size: clamp(14px, 3vw, 20px);
+      letter-spacing: 5px;
       text-transform: uppercase;
-      color: #ffcc00;
-      border: 2px solid #ffcc00;
-      padding: 0.25rem 0.9rem;
+      color: #ccc;
+      animation: blink 1.3s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.22; }
+    }
+
+    /* ---- Controls hint ---- */
+    .hint {
+      margin-top: 30px;
+      font-size: clamp(11px, 1.8vw, 13px);
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: #3a3a3a;
+      text-align: center;
+      line-height: 2;
+      text-transform: uppercase;
+    }
+    .hint span { color: #555; }
+
+    /* ---- Game Over ---- */
+    .gameover-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(52px, 13vw, 100px);
+      letter-spacing: 4px;
+      color: #E8201A;
+      filter: drop-shadow(0 0 22px rgba(232,32,26,0.6));
+      line-height: 1;
+    }
+    .score-label {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: clamp(11px, 2vw, 15px);
+      font-weight: 600;
+      letter-spacing: 4px;
+      color: #444;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .final-score {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(40px, 10vw, 78px);
+      color: #F5B800;
+      line-height: 1;
+      filter: drop-shadow(0 0 14px rgba(245,184,0,0.48));
+    }
+
+    .play-btn {
+      margin-top: 38px;
+      padding: 13px 56px;
+      background: linear-gradient(150deg, #E8201A, #b81410);
+      color: #fff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 5px;
+      border: none;
       border-radius: 3px;
+      cursor: pointer;
+      box-shadow: 0 4px 28px rgba(232,32,26,0.42),
+                  inset 0 1px 0 rgba(255,255,255,0.12);
+      transition: transform 0.08s, box-shadow 0.08s;
     }
-
-    .divider {
-      width: 60px;
-      height: 3px;
-      background: linear-gradient(90deg, #e8000d, #ffcc00);
-      margin: 2rem auto;
-      border-radius: 2px;
+    .play-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 7px 38px rgba(232,32,26,0.62),
+                  inset 0 1px 0 rgba(255,255,255,0.12);
     }
+    .play-btn:active { transform: scale(0.96); }
 
-    .coming-soon {
-      font-size: clamp(0.85rem, 2.5vw, 1.1rem);
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: #888;
-    }
-
-    /* subtle animated glow behind the title */
-    .glow {
-      position: absolute;
-      width: 500px;
-      height: 500px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(232,0,13,0.12) 0%, transparent 70%);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+    /* ---- Coin HUD (top-left) ---- */
+    #coinHud {
+      position: fixed;
+      top: 18px; left: 22px;
+      display: none;
+      align-items: center;
+      gap: 7px;
       pointer-events: none;
-      animation: pulse 4s ease-in-out infinite;
+      z-index: 10;
+    }
+    #coinHud .coin-icon {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ffe066, #F5B800 60%, #b88000);
+      box-shadow: 0 0 8px rgba(245,184,0,0.7);
+      flex-shrink: 0;
+    }
+    #coinCount {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(24px, 4vw, 36px);
+      color: #F5B800;
+      line-height: 1;
+      text-shadow: 0 0 14px rgba(245,184,0,0.55);
     }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
-      50%       { opacity: 1;   transform: translate(-50%, -50%) scale(1.15); }
+    /* ---- Graze warning flash (gold edge burst, one-life warning) ---- */
+    #grazeFlash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 16;
+      background: radial-gradient(ellipse at 50% 50%,
+        transparent 35%, rgba(245,184,0,0.45) 72%, rgba(245,184,0,0.72) 100%);
+      opacity: 0;
+    }
+    @keyframes grazeFlashAnim {
+      0%   { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    #grazeFlash.active { animation: grazeFlashAnim 0.65s ease-out forwards; }
+
+    /* ---- Chaser danger overlay ---- */
+    /* Grows up from the bottom as The Muncher closes in */
+    #dangerOverlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+      background: radial-gradient(ellipse at 50% 115%,
+        rgba(232,32,26,0.82) 0%,
+        rgba(232,32,26,0.28) 38%,
+        transparent 65%);
+      opacity: 0;
+      transition: opacity 0.15s;
     }
   </style>
 </head>
 <body>
-  <div class="glow"></div>
-  <div class="container">
-    <div class="logo-text">Dash Blitz</div>
-    <div class="v2-badge">Version 2</div>
-    <div class="divider"></div>
-    <div class="coming-soon">Coming Soon</div>
+
+<canvas id="renderCanvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="label">Score</div>
+  <div id="scoreDisplay">0</div>
+</div>
+
+<!-- Coin HUD -->
+<div id="coinHud">
+  <div class="coin-icon"></div>
+  <div id="coinCount">0</div>
+</div>
+
+<!-- Start Screen -->
+<div id="startScreen" class="overlay">
+  <div class="logo">DASH BLITZ</div>
+  <div class="deco"></div>
+  <div class="tap-prompt">Tap to Play</div>
+  <div class="hint">
+    <span>← →</span> Switch lanes &nbsp;&nbsp; <span>↑ / Space</span> Jump &nbsp;&nbsp; <span>↓ / S</span> Slam<br>
+    Swipe left / right / up / down on mobile
   </div>
+</div>
+
+<!-- Game Over Screen -->
+<div id="gameOverScreen" class="overlay hidden">
+  <div class="gameover-title">Game Over</div>
+  <div class="deco"></div>
+  <div class="score-label">Final Score</div>
+  <div class="final-score" id="finalScore">0</div>
+  <button class="play-btn" id="playAgainBtn">Play Again</button>
+</div>
+
+<!-- Chaser danger vignette (always present, opacity driven by JS) -->
+<div id="dangerOverlay"></div>
+
+<!-- Graze warning: gold edge flash on first graze -->
+<div id="grazeFlash"></div>
+
+<!-- Babylon.js 7.x -->
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+
+<script type="module">
+// ================================================================
+//  DASH BLITZ  —  Core Game Engine  (Phase 1)
+//  Single-file static build for GitHub Pages
+//  Backend: Supabase (Phase 2+) — auth, leaderboard, user data
+// ================================================================
+
+// ---- Engine & Scene ------------------------------------------------
+const canvas = document.getElementById('renderCanvas');
+const engine = new BABYLON.Engine(canvas, true, {
+  preserveDrawingBuffer: false,
+  stencil: false,
+  powerPreference: 'high-performance'
+});
+const scene = new BABYLON.Scene(engine);
+scene.clearColor = new BABYLON.Color4(0.051, 0.051, 0.055, 1);
+scene.fogMode    = BABYLON.Scene.FOGMODE_EXP2;
+scene.fogColor   = new BABYLON.Color3(0.05, 0.05, 0.055);
+scene.fogDensity = 0.022;
+
+// ---- Config --------------------------------------------------------
+const LANE_X      = [-2.2, 0, 2.2];
+const TRACK_W     = 7.2;
+const TILE_D      = 8;
+const TILE_N      = 16;
+const WRAP_Q      = TILE_N * TILE_D;
+const SPAWN_Z     = 62;
+const DESPAWN_Z   = -14;
+
+const BASE_SPD    = 12;     // comfortable starting pace
+const MAX_SPD     = 30;     // genuinely intense ceiling
+const ACCEL       = 0.28;   // ~65s to reach max — earned
+
+// Jump: punchy arc, faster fall than rise.
+// Apex ≈ 2.82 units, total air time ≈ 0.76s.
+const JUMP_V      = 13.0;
+const GRAV_RISE   = -30;
+const GRAV_FALL   = -52;
+const GROUND_Y    = 0.55;
+
+// Lane switch: ease-in-out cubic over 130ms
+const LANE_DUR    = 0.13;
+
+const POOL_SZ     = 14;
+const SPAWN_T0    = 2.5;
+const SPAWN_TMIN  = 0.85;
+
+// Squash / slam
+const SQUASH_DUR  = 0.20;   // seconds for squash animation
+
+// Chaser ("The Muncher")
+const CHASER_MAX     = 28;  // full retreat — comfortably safe
+const CHASER_START   = 22;  // distance at run start
+const CHASER_RETREAT = 1.8; // units/s it falls behind during clean run
+const CHASER_SURGE1  = 16;  // distance it closes on first graze
+
+// ---- Camera --------------------------------------------------------
+// Positioned higher and further back so The Muncher is visible
+// at the bottom of the screen when it gets close.
+const camera = new BABYLON.FreeCamera('cam',
+  new BABYLON.Vector3(0, 7, -11), scene);
+camera.setTarget(new BABYLON.Vector3(0, 0.8, 20));
+camera.fov  = 0.9;   // slightly wider FOV
+camera.minZ = 0.1;
+camera.maxZ = 220;
+
+// ---- Lighting ------------------------------------------------------
+const hemi = new BABYLON.HemisphericLight('hemi',
+  new BABYLON.Vector3(0, 1, 0), scene);
+hemi.intensity   = 0.28;
+hemi.diffuse     = new BABYLON.Color3(0.7, 0.7, 0.85);
+hemi.groundColor = new BABYLON.Color3(0.04, 0.04, 0.06);
+
+const sun = new BABYLON.DirectionalLight('sun',
+  new BABYLON.Vector3(-0.25, -1, 0.6), scene);
+sun.intensity = 1.3;
+sun.diffuse   = new BABYLON.Color3(1, 0.94, 0.88);
+
+const rimLight = new BABYLON.PointLight('rim',
+  new BABYLON.Vector3(0, 2.5, -8), scene);
+rimLight.diffuse   = new BABYLON.Color3(0.95, 0.08, 0.04);
+rimLight.intensity = 1.8;
+rimLight.range     = 22;
+
+// ---- Materials -----------------------------------------------------
+const matTrack = new BABYLON.StandardMaterial('track', scene);
+matTrack.diffuseColor  = new BABYLON.Color3(0.065, 0.065, 0.075);
+matTrack.specularColor = new BABYLON.Color3(0.04, 0.04, 0.06);
+
+const matEdge = new BABYLON.StandardMaterial('edge', scene);
+matEdge.diffuseColor  = new BABYLON.Color3(0.9, 0.08, 0.04);
+matEdge.emissiveColor = new BABYLON.Color3(0.68, 0.04, 0.02);
+
+const matDiv = new BABYLON.StandardMaterial('div', scene);
+matDiv.diffuseColor  = new BABYLON.Color3(0.14, 0.14, 0.18);
+matDiv.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.08);
+
+const matApple = new BABYLON.PBRMaterial('apple', scene);
+matApple.albedoColor          = new BABYLON.Color3(0.92, 0.11, 0.07);
+matApple.metallic             = 0.05;
+matApple.roughness            = 0.12;
+matApple.environmentIntensity = 0.35;
+
+const matLeaf = new BABYLON.PBRMaterial('leaf', scene);
+matLeaf.albedoColor = new BABYLON.Color3(0.08, 0.78, 0.14);
+matLeaf.metallic    = 0.0;
+matLeaf.roughness   = 0.18;
+
+const matStem = new BABYLON.StandardMaterial('stem', scene);
+matStem.diffuseColor = new BABYLON.Color3(0.22, 0.48, 0.08);
+
+// Obstacle materials — themed
+const matCan = new BABYLON.PBRMaterial('can', scene);
+matCan.albedoColor          = new BABYLON.Color3(0.82, 0.08, 0.06);
+matCan.metallic             = 0.72;
+matCan.roughness            = 0.28;
+matCan.environmentIntensity = 0.3;
+
+const matCanCap = new BABYLON.PBRMaterial('canCap', scene);
+matCanCap.albedoColor          = new BABYLON.Color3(0.72, 0.72, 0.76);
+matCanCap.metallic             = 0.85;
+matCanCap.roughness            = 0.22;
+matCanCap.environmentIntensity = 0.3;
+
+const matCrate = new BABYLON.PBRMaterial('crate', scene);
+matCrate.albedoColor          = new BABYLON.Color3(0.44, 0.28, 0.12);
+matCrate.metallic             = 0.0;
+matCrate.roughness            = 0.88;
+matCrate.environmentIntensity = 0.15;
+
+const matCart = new BABYLON.PBRMaterial('cart', scene);
+matCart.albedoColor          = new BABYLON.Color3(0.40, 0.40, 0.44);
+matCart.metallic             = 0.70;
+matCart.roughness             = 0.40;
+matCart.environmentIntensity = 0.25;
+
+// Keep legacy matObs (unused after pool replacement, kept to avoid errors)
+const matObs = matCan;
+
+// ---- Track ---------------------------------------------------------
+const gTiles = [], gEdgeL = [], gEdgeR = [], gDivL = [], gDivR = [];
+
+for (let i = 0; i < TILE_N; i++) {
+  const z = i * TILE_D;
+
+  const tile = BABYLON.MeshBuilder.CreateBox('gt'+i,
+    { width: TRACK_W, height: 0.14, depth: TILE_D }, scene);
+  tile.material = matTrack;
+  tile.position.set(0, -0.07, z);
+  gTiles.push(tile);
+
+  const el = BABYLON.MeshBuilder.CreateBox('el'+i,
+    { width: 0.11, height: 0.13, depth: TILE_D }, scene);
+  el.material = matEdge;
+  el.position.set(-(TRACK_W / 2 - 0.06), 0.01, z);
+  gEdgeL.push(el);
+
+  const er = BABYLON.MeshBuilder.CreateBox('er'+i,
+    { width: 0.11, height: 0.13, depth: TILE_D }, scene);
+  er.material = matEdge;
+  er.position.set(TRACK_W / 2 - 0.06, 0.01, z);
+  gEdgeR.push(er);
+
+  const dl = BABYLON.MeshBuilder.CreateBox('dl'+i,
+    { width: 0.055, height: 0.09, depth: TILE_D }, scene);
+  dl.material = matDiv;
+  dl.position.set(-1.1, 0.01, z);
+  gDivL.push(dl);
+
+  const dr = BABYLON.MeshBuilder.CreateBox('dr'+i,
+    { width: 0.055, height: 0.09, depth: TILE_D }, scene);
+  dr.material = matDiv;
+  dr.position.set(1.1, 0.01, z);
+  gDivR.push(dr);
+}
+
+const allTrack = [...gTiles, ...gEdgeL, ...gEdgeR, ...gDivL, ...gDivR];
+
+function scrollTrack(dt, spd) {
+  for (const m of allTrack) {
+    m.position.z -= spd * dt;
+    if (m.position.z < DESPAWN_Z) m.position.z += WRAP_Q;
+  }
+}
+
+function resetTrack() {
+  for (let i = 0; i < TILE_N; i++) {
+    const z = i * TILE_D;
+    gTiles[i].position.z = z;
+    gEdgeL[i].position.z = z;
+    gEdgeR[i].position.z = z;
+    gDivL[i].position.z  = z;
+    gDivR[i].position.z  = z;
+  }
+}
+
+// ---- Player (the Apple) --------------------------------------------
+const pBody = BABYLON.MeshBuilder.CreateSphere('apple',
+  { diameter: 1.1, segments: 20 }, scene);
+pBody.material = matApple;
+
+const pLeaf = BABYLON.MeshBuilder.CreateSphere('leaf',
+  { diameter: 0.52, segments: 10 }, scene);
+pLeaf.material = matLeaf;
+pLeaf.scaling.set(0.72, 0.32, 0.9);
+
+const pStem = BABYLON.MeshBuilder.CreateCylinder('stem',
+  { diameter: 0.065, height: 0.28, tessellation: 6 }, scene);
+pStem.material = matStem;
+
+// Apple eyes (face forward = -Z)
+const matEyeWhite = new BABYLON.StandardMaterial('eyeWhite', scene);
+matEyeWhite.diffuseColor  = new BABYLON.Color3(0.95, 0.95, 0.95);
+matEyeWhite.emissiveColor = new BABYLON.Color3(0.18, 0.18, 0.18);
+
+const matEyePupil = new BABYLON.StandardMaterial('eyePupil', scene);
+matEyePupil.diffuseColor  = new BABYLON.Color3(0.06, 0.06, 0.06);
+matEyePupil.emissiveColor = new BABYLON.Color3(0.04, 0.04, 0.04);
+
+const pEyeL = BABYLON.MeshBuilder.CreateSphere('eyeL',
+  { diameter: 0.19, segments: 8 }, scene);
+pEyeL.material = matEyeWhite;
+
+const pEyeR = BABYLON.MeshBuilder.CreateSphere('eyeR',
+  { diameter: 0.19, segments: 8 }, scene);
+pEyeR.material = matEyeWhite;
+
+const pPupilL = BABYLON.MeshBuilder.CreateSphere('pupilL',
+  { diameter: 0.10, segments: 6 }, scene);
+pPupilL.material = matEyePupil;
+
+const pPupilR = BABYLON.MeshBuilder.CreateSphere('pupilR',
+  { diameter: 0.10, segments: 6 }, scene);
+pPupilR.material = matEyePupil;
+
+// Player state
+const lane      = { cur: 1, tgt: 1 };
+const pPos      = { x: LANE_X[1], y: GROUND_Y };
+let velY        = 0;
+let jumping     = false;
+let squashT     = 0;  // counts down from SQUASH_DUR after landing/slam
+
+const laneTween = { fromX: LANE_X[1], toX: LANE_X[1], p: 1.0 };
+const easeInOut = t => t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t;
+
+// Lean angles (radians). Z = roll on lane switch, X = pitch on jump.
+const lean = { z: 0, x: 0 };
+const LEAN_LANE_ANG  = 15 * Math.PI / 180;  // 15° roll toward movement dir
+const LEAN_JUMP_UP   =  8 * Math.PI / 180;  // tilt back on rise
+const LEAN_JUMP_DOWN = -6 * Math.PI / 180;  // tilt forward on fall
+const LEAN_RETURN    = 8.0;                  // return speed (rad/s)
+
+function placePlayer() {
+  pBody.position.set(pPos.x, pPos.y, 0);
+  pLeaf.position.set(pPos.x, pPos.y + 0.60, 0.04);
+  pStem.position.set(pPos.x, pPos.y + 0.82, 0.04);
+  // Eyes face forward (-Z). Offset ±0.14 X, +0.10 Y from body center, -0.42 Z (embedded)
+  pEyeL.position.set(pPos.x - 0.14, pPos.y + 0.10, -0.42);
+  pEyeR.position.set(pPos.x + 0.14, pPos.y + 0.10, -0.42);
+  pPupilL.position.set(pPos.x - 0.14, pPos.y + 0.10, -0.48);
+  pPupilR.position.set(pPos.x + 0.14, pPos.y + 0.10, -0.48);
+}
+
+function resetPlayer() {
+  lane.cur = 1; lane.tgt = 1;
+  pPos.x   = LANE_X[1];
+  pPos.y   = GROUND_Y;
+  velY     = 0;
+  jumping  = false;
+  squashT  = 0;
+  laneTween.fromX = LANE_X[1];
+  laneTween.toX   = LANE_X[1];
+  laneTween.p     = 1;
+  pBody.scaling.set(1, 1, 1);
+  pLeaf.scaling.set(0.72, 0.32, 0.9);
+  pStem.scaling.set(1, 1, 1);
+  lean.z = 0; lean.x = 0;
+  pBody.rotation.set(0, 0, 0);
+  placePlayer();
+}
+resetPlayer();
+
+// ---- Dust particles (slam / landing impact) ------------------------
+// Particle texture: soft radial gradient, generated from a canvas
+const _ptc  = document.createElement('canvas');
+_ptc.width  = _ptc.height = 32;
+const _pctx = _ptc.getContext('2d');
+const _pgr  = _pctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+_pgr.addColorStop(0,   'rgba(255,235,180,1)');
+_pgr.addColorStop(0.5, 'rgba(220,195,150,0.6)');
+_pgr.addColorStop(1,   'rgba(200,170,120,0)');
+_pctx.fillStyle = _pgr;
+_pctx.beginPath(); _pctx.arc(16, 16, 16, 0, Math.PI * 2); _pctx.fill();
+
+const dustPS = new BABYLON.ParticleSystem('dust', 40, scene);
+dustPS.particleTexture = new BABYLON.Texture(_ptc.toDataURL(), scene);
+dustPS.emitter         = new BABYLON.Vector3(0, GROUND_Y, 0);
+dustPS.minEmitBox      = new BABYLON.Vector3(-0.4, 0, -0.3);
+dustPS.maxEmitBox      = new BABYLON.Vector3(0.4,  0,  0.3);
+dustPS.direction1      = new BABYLON.Vector3(-3, 1, -2);
+dustPS.direction2      = new BABYLON.Vector3(3,  4,  2);
+dustPS.minSize         = 0.06; dustPS.maxSize     = 0.22;
+dustPS.minLifeTime     = 0.12; dustPS.maxLifeTime = 0.30;
+dustPS.minEmitPower    = 1.5;  dustPS.maxEmitPower = 4.5;
+dustPS.emitRate        = 0;    // burst-only
+dustPS.gravity         = new BABYLON.Vector3(0, -9, 0);
+dustPS.color1          = new BABYLON.Color4(0.92, 0.82, 0.68, 1);
+dustPS.color2          = new BABYLON.Color4(0.78, 0.68, 0.52, 0.7);
+dustPS.colorDead       = new BABYLON.Color4(0.60, 0.52, 0.38, 0);
+dustPS.blendMode       = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
+
+function burstDust(x) {
+  dustPS.emitter.x       = x;
+  dustPS.manualEmitCount = 22;
+  dustPS.start();
+}
+
+// ---- Obstacle Pool — 3 themed types --------------------------------
+// Each obstacle is a TransformNode root with child meshes.
+// _halfW: collision half-width (X). _type: 'can'|'crate'|'cart'
+
+function makeCanObs(idx) {
+  const root = new BABYLON.TransformNode('obs_can_' + idx, scene);
+  const body = BABYLON.MeshBuilder.CreateCylinder('canBody_' + idx,
+    { diameter: 0.70, height: 1.20, tessellation: 16 }, scene);
+  body.material = matCan;
+  body.position.y = 0.60;
+  body.parent = root;
+  const cap = BABYLON.MeshBuilder.CreateCylinder('canCap_' + idx,
+    { diameter: 0.62, height: 0.10, tessellation: 16 }, scene);
+  cap.material = matCanCap;
+  cap.position.y = 1.25;
+  cap.parent = root;
+  root._meshes = [body, cap];
+  root._halfW  = 0.38;
+  root._type   = 'can';
+  return root;
+}
+
+function makeCrateObs(idx) {
+  const root = new BABYLON.TransformNode('obs_crate_' + idx, scene);
+  const bot = BABYLON.MeshBuilder.CreateBox('crateBot_' + idx,
+    { width: 1.0, height: 0.80, depth: 1.0 }, scene);
+  bot.material = matCrate;
+  bot.position.y = 0.40;
+  bot.parent = root;
+  const top = BABYLON.MeshBuilder.CreateBox('crateTop_' + idx,
+    { width: 0.80, height: 0.80, depth: 0.80 }, scene);
+  top.material = matCrate;
+  top.position.set(0.06, 1.20, -0.05);
+  top.parent = root;
+  root._meshes = [bot, top];
+  root._halfW  = 0.52;
+  root._type   = 'crate';
+  return root;
+}
+
+function makeCartObs(idx) {
+  const root = new BABYLON.TransformNode('obs_cart_' + idx, scene);
+  // Basket frame: back, front, left side, right side, base
+  const parts = [
+    { w:1.20, h:0.70, d:0.06, x:0,     y:0.65, z: 0.46 }, // back
+    { w:1.20, h:0.70, d:0.06, x:0,     y:0.65, z:-0.46 }, // front
+    { w:0.06, h:0.70, d:0.92, x:-0.57, y:0.65, z:0    }, // left
+    { w:0.06, h:0.70, d:0.92, x: 0.57, y:0.65, z:0    }, // right
+    { w:1.20, h:0.06, d:0.92, x:0,     y:0.32, z:0    }, // base
+    // Handle bar across top-back
+    { w:1.20, h:0.07, d:0.07, x:0,     y:1.08, z: 0.40 },
+  ];
+  const meshes = [];
+  for (let k = 0; k < parts.length; k++) {
+    const p  = parts[k];
+    const bx = BABYLON.MeshBuilder.CreateBox('cartP_' + idx + '_' + k,
+      { width: p.w, height: p.h, depth: p.d }, scene);
+    bx.material = matCart;
+    bx.position.set(p.x, p.y, p.z);
+    bx.parent = root;
+    meshes.push(bx);
+  }
+  root._meshes = meshes;
+  root._halfW  = 0.62;
+  root._type   = 'cart';
+  return root;
+}
+
+const OBS_PER_TYPE = 5;
+const obsPool   = [];
+const obsActive = [];
+
+for (let i = 0; i < OBS_PER_TYPE; i++) {
+  const can   = makeCanObs(i);
+  const crate = makeCrateObs(i);
+  const cart  = makeCartObs(i);
+  for (const root of [can, crate, cart]) {
+    root._active = false;
+    root._grazed = false;
+    root.position.set(0, 0, SPAWN_Z + 200);
+    for (const m of root._meshes) m.isVisible = false;
+    obsPool.push(root);
+  }
+}
+
+function spawnObs() {
+  const available = obsPool.filter(o => !o._active);
+  if (!available.length) return;
+  // Pick random type from available
+  const m = available[Math.floor(Math.random() * available.length)];
+  const l = Math.floor(Math.random() * 3);
+  m.position.set(LANE_X[l], 0, SPAWN_Z);
+  // Slight random Y rotation for cans/crates
+  if (m._type !== 'cart') m.rotation.y = (Math.random() - 0.5) * 0.8;
+  for (const mesh of m._meshes) mesh.isVisible = true;
+  m._active = true;
+  m._grazed = false;
+  obsActive.push(m);
+}
+
+function despawnObs(m) {
+  for (const mesh of m._meshes) mesh.isVisible = false;
+  m._active    = false;
+  m.position.z = SPAWN_Z + 200;
+  const i = obsActive.indexOf(m);
+  if (i >= 0) obsActive.splice(i, 1);
+}
+
+function clearObs() {
+  while (obsActive.length) despawnObs(obsActive[0]);
+}
+
+// ---- Coin Pool -----------------------------------------------------
+const COIN_POOL_SZ  = 20;
+const COIN_SPAWN_Z  = SPAWN_Z;
+const COIN_RADIUS   = 0.8;   // collect radius (generous / magnetic)
+
+const matCoin = new BABYLON.PBRMaterial('coin', scene);
+matCoin.albedoColor          = new BABYLON.Color3(1.0, 0.82, 0.10);
+matCoin.metallic             = 0.85;
+matCoin.roughness            = 0.18;
+matCoin.emissiveColor        = new BABYLON.Color3(0.55, 0.38, 0.0);
+matCoin.environmentIntensity = 0.4;
+
+const coinTpl = BABYLON.MeshBuilder.CreateTorus('coin_tpl',
+  { diameter: 0.52, thickness: 0.18, tessellation: 20 }, scene);
+coinTpl.material  = matCoin;
+coinTpl.isVisible = false;
+
+const coinPool   = [];
+const coinActive = [];
+let   coinCount  = 0;
+
+// Coin canvas texture for particle burst (gold gradient)
+const _ctc  = document.createElement('canvas');
+_ctc.width  = _ctc.height = 32;
+const _cctx = _ctc.getContext('2d');
+const _cgr  = _cctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+_cgr.addColorStop(0,   'rgba(255,235,100,1)');
+_cgr.addColorStop(0.5, 'rgba(245,184,0,0.7)');
+_cgr.addColorStop(1,   'rgba(200,140,0,0)');
+_cctx.fillStyle = _cgr;
+_cctx.beginPath(); _cctx.arc(16, 16, 16, 0, Math.PI * 2); _cctx.fill();
+
+const coinPS = new BABYLON.ParticleSystem('coinPS', 24, scene);
+coinPS.particleTexture = new BABYLON.Texture(_ctc.toDataURL(), scene);
+coinPS.emitter         = new BABYLON.Vector3(0, GROUND_Y + 0.5, 0);
+coinPS.minEmitBox      = new BABYLON.Vector3(-0.1, 0, -0.1);
+coinPS.maxEmitBox      = new BABYLON.Vector3(0.1, 0, 0.1);
+coinPS.direction1      = new BABYLON.Vector3(-2, 3, -2);
+coinPS.direction2      = new BABYLON.Vector3(2, 6, 2);
+coinPS.minSize         = 0.05; coinPS.maxSize     = 0.16;
+coinPS.minLifeTime     = 0.15; coinPS.maxLifeTime = 0.35;
+coinPS.minEmitPower    = 2.0;  coinPS.maxEmitPower = 5.0;
+coinPS.emitRate        = 0;
+coinPS.gravity         = new BABYLON.Vector3(0, -12, 0);
+coinPS.color1          = new BABYLON.Color4(1.0, 0.92, 0.2, 1);
+coinPS.color2          = new BABYLON.Color4(0.95, 0.72, 0.0, 0.8);
+coinPS.colorDead       = new BABYLON.Color4(0.8, 0.55, 0.0, 0);
+coinPS.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+
+function burstCoin(x, z) {
+  coinPS.emitter.set(x, GROUND_Y + 0.5, z);
+  coinPS.manualEmitCount = 14;
+  coinPS.start();
+}
+
+for (let i = 0; i < COIN_POOL_SZ; i++) {
+  const inst      = coinTpl.createInstance('coin_' + i);
+  inst.isVisible  = false;
+  inst._active    = false;
+  inst._popT      = 0;   // pop-scale animation countdown
+  inst._rotY      = Math.random() * Math.PI * 2;
+  coinPool.push(inst);
+}
+
+// Spawn a group of coins — up to 3 in a row in one lane, or scattered
+function spawnCoins() {
+  const pattern = Math.random();
+  let plan;
+  if (pattern < 0.4) {
+    // 3 in a row in one lane
+    const l = Math.floor(Math.random() * 3);
+    plan = [
+      { lane: l, zOff: 0 },
+      { lane: l, zOff: 2.2 },
+      { lane: l, zOff: 4.4 },
+    ];
+  } else if (pattern < 0.75) {
+    // 2 scattered
+    const l1 = Math.floor(Math.random() * 3);
+    let l2   = Math.floor(Math.random() * 3);
+    if (l2 === l1) l2 = (l2 + 1) % 3;
+    plan = [
+      { lane: l1, zOff: 0 },
+      { lane: l2, zOff: 1.8 },
+    ];
+  } else {
+    // 1 coin
+    plan = [{ lane: Math.floor(Math.random() * 3), zOff: 0 }];
+  }
+
+  for (const p of plan) {
+    // Overlap check: reject if any active obstacle is within 1.2 Z of this coin
+    const cx = LANE_X[p.lane];
+    const cz = COIN_SPAWN_Z - p.zOff;
+    const blocked = obsActive.some(
+      o => Math.abs(o.position.x - cx) < 1.0 && Math.abs(o.position.z - cz) < 1.2
+    );
+    if (blocked) continue;
+
+    const m = coinPool.find(c => !c._active);
+    if (!m) continue;
+    m.position.set(cx, GROUND_Y + 0.52, cz);
+    m.isVisible  = true;
+    m._active    = true;
+    m._popT      = 0;
+    coinActive.push(m);
+  }
+}
+
+function collectCoin(m) {
+  // Pop animation: scale up briefly, then hide
+  m._popT = 0.12;
+}
+
+function despawnCoin(m) {
+  m.isVisible  = false;
+  m._active    = false;
+  m.scaling.setAll(1);
+  m.position.z = COIN_SPAWN_Z + 200;
+  const i = coinActive.indexOf(m);
+  if (i >= 0) coinActive.splice(i, 1);
+}
+
+function clearCoins() {
+  while (coinActive.length) despawnCoin(coinActive[0]);
+}
+
+const coinHudEl  = document.getElementById('coinHud');
+const coinCountEl = document.getElementById('coinCount');
+function showCoinHud()    { coinHudEl.style.display = 'flex'; }
+function hideCoinHud()    { coinHudEl.style.display = 'none'; }
+function updateCoinHud()  { coinCountEl.textContent = coinCount; }
+
+// ---- Collision detection -------------------------------------------
+// Returns 'HIT' (head-on → instant death),
+//         'GRAZE' (side clip → chaser surges),
+//         or null (clean).
+function checkCollisions() {
+  const px = pPos.x, py = pPos.y;
+  for (const m of obsActive) {
+    const dz = Math.abs(m.position.z); if (dz > 0.75) continue;
+    // Y: cans are tall (1.2), crates are taller (1.6 stacked), cart ~1.1
+    const dy = Math.abs(py - 0.55);    if (dy > 0.82) continue;
+    const dx  = Math.abs(px - m.position.x);
+    const hw  = m._halfW || 0.52;
+    if (dx < hw - 0.10) return 'HIT';
+    if (dx < hw + 0.28 && !m._grazed) { m._grazed = true; return 'GRAZE'; }
+  }
+  return null;
+}
+
+// ================================================================
+//  THE MUNCHER  —  chaser character
+//  A giant hungry mouth that wants to eat the apple.
+//  Visible at the bottom of the screen when it gets close.
+// ================================================================
+
+const matMBody = new BABYLON.StandardMaterial('mBody', scene);
+matMBody.diffuseColor  = new BABYLON.Color3(0.16, 0.08, 0.28);
+matMBody.emissiveColor = new BABYLON.Color3(0.05, 0.02, 0.10);
+
+const matMJaw = new BABYLON.StandardMaterial('mJaw', scene);
+matMJaw.diffuseColor  = new BABYLON.Color3(0.20, 0.10, 0.34);
+matMJaw.emissiveColor = new BABYLON.Color3(0.06, 0.02, 0.12);
+
+const matMTeeth = new BABYLON.StandardMaterial('mTeeth', scene);
+matMTeeth.diffuseColor  = new BABYLON.Color3(0.96, 0.93, 0.88);
+matMTeeth.emissiveColor = new BABYLON.Color3(0.12, 0.10, 0.08);
+
+const matMMouth = new BABYLON.StandardMaterial('mMouth', scene);
+matMMouth.diffuseColor  = new BABYLON.Color3(0.55, 0.04, 0.06);
+matMMouth.emissiveColor = new BABYLON.Color3(0.38, 0.02, 0.03);
+
+const matMEye = new BABYLON.StandardMaterial('mEye', scene);
+matMEye.diffuseColor  = new BABYLON.Color3(1, 1, 1);
+matMEye.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+
+const matMPupil = new BABYLON.StandardMaterial('mPupil', scene);
+matMPupil.diffuseColor  = new BABYLON.Color3(0.9, 0.06, 0.02);
+matMPupil.emissiveColor = new BABYLON.Color3(0.65, 0.03, 0.01);
+
+// Root node — we only move this
+const muncher = new BABYLON.TransformNode('muncher', scene);
+
+// Body — wide squished sphere
+const mBody = BABYLON.MeshBuilder.CreateSphere('mBody',
+  { diameter: 4.2, segments: 12 }, scene);
+mBody.material = matMBody;
+mBody.scaling.set(1.0, 0.55, 0.9);
+mBody.position.y = 1.2;
+mBody.parent = muncher;
+
+// Mouth interior (deep red, visible between jaws)
+const mMouth = BABYLON.MeshBuilder.CreateBox('mMouth',
+  { width: 3.1, height: 0.85, depth: 1.2 }, scene);
+mMouth.material = matMMouth;
+mMouth.position.y = 2.4;
+mMouth.parent = muncher;
+
+// Upper jaw
+const mJawU = BABYLON.MeshBuilder.CreateBox('mJawU',
+  { width: 3.5, height: 0.62, depth: 1.55 }, scene);
+mJawU.material = matMJaw;
+mJawU.position.y = 2.88;
+mJawU.parent = muncher;
+
+// Lower jaw
+const mJawL = BABYLON.MeshBuilder.CreateBox('mJawL',
+  { width: 3.5, height: 0.52, depth: 1.55 }, scene);
+mJawL.material = matMJaw;
+mJawL.position.y = 1.94;
+mJawL.parent = muncher;
+
+// Upper teeth (4)
+for (let i = 0; i < 4; i++) {
+  const t = BABYLON.MeshBuilder.CreateBox('mutT'+i,
+    { width: 0.33, height: 0.56, depth: 0.28 }, scene);
+  t.material  = matMTeeth;
+  t.position.set(-1.35 + i * 0.9, 2.62, -0.62);
+  t.parent = muncher;
+}
+
+// Lower teeth (4)
+for (let i = 0; i < 4; i++) {
+  const t = BABYLON.MeshBuilder.CreateBox('mltT'+i,
+    { width: 0.29, height: 0.48, depth: 0.28 }, scene);
+  t.material  = matMTeeth;
+  t.position.set(-1.35 + i * 0.9, 2.18, -0.62);
+  t.parent = muncher;
+}
+
+// Eyes (white spheres)
+const mEyeL = BABYLON.MeshBuilder.CreateSphere('mEyeL',
+  { diameter: 0.98, segments: 10 }, scene);
+mEyeL.material = matMEye;
+mEyeL.position.set(-0.98, 3.90, -0.52);
+mEyeL.parent = muncher;
+
+const mEyeR = BABYLON.MeshBuilder.CreateSphere('mEyeR',
+  { diameter: 0.98, segments: 10 }, scene);
+mEyeR.material = matMEye;
+mEyeR.position.set(0.98, 3.90, -0.52);
+mEyeR.parent = muncher;
+
+// Pupils (glowing red)
+const mPupilL = BABYLON.MeshBuilder.CreateSphere('mPupilL',
+  { diameter: 0.54, segments: 8 }, scene);
+mPupilL.material = matMPupil;
+mPupilL.position.set(-0.98, 3.90, -0.95);
+mPupilL.parent = muncher;
+
+const mPupilR = BABYLON.MeshBuilder.CreateSphere('mPupilR',
+  { diameter: 0.54, segments: 8 }, scene);
+mPupilR.material = matMPupil;
+mPupilR.position.set(0.98, 3.90, -0.95);
+mPupilR.parent = muncher;
+
+// Scale 0.55 — 42% of previous 1.3× scale, per Alan's feedback.
+// Root Y raised to 1.0 so the eyes (world y≈3.15) sit above the
+// camera frustum bottom even at safe distances.
+muncher.scaling.setAll(0.55);
+muncher.position.set(0, 1.0, -14);
+let muncherT = 0;  // jaw animation clock
+
+// ---- Chaser state --------------------------------------------------
+const chaser = { dist: CHASER_START, grazes: 0 };
+
+function resetChaser() {
+  chaser.dist   = CHASER_START;
+  chaser.grazes = 0;
+}
+
+// ---- Input ---------------------------------------------------------
+let tx0 = 0, ty0 = 0;
+
+function doLeft() {
+  if (gs !== 'PLAY' || lane.tgt <= 0) return;
+  lane.tgt--;
+  laneTween.fromX = pPos.x;
+  laneTween.toX   = LANE_X[lane.tgt];
+  laneTween.p     = 0;
+}
+function doRight() {
+  if (gs !== 'PLAY' || lane.tgt >= 2) return;
+  lane.tgt++;
+  laneTween.fromX = pPos.x;
+  laneTween.toX   = LANE_X[lane.tgt];
+  laneTween.p     = 0;
+}
+function doJump() {
+  if (gs === 'PLAY' && !jumping) { velY = JUMP_V; jumping = true; }
+}
+function doSlam() {
+  if (gs !== 'PLAY' || !jumping) return;
+  pPos.y  = GROUND_Y;
+  velY    = 0;
+  jumping = false;
+  squashT = SQUASH_DUR;        // full squash on slam (deeper than normal landing)
+  burstDust(pPos.x);
+}
+
+window.addEventListener('keydown', e => {
+  switch (e.key) {
+    case 'ArrowLeft':  case 'a': case 'A': doLeft();  break;
+    case 'ArrowRight': case 'd': case 'D': doRight(); break;
+    case 'ArrowUp':    case 'w': case 'W': case ' ':  doJump(); break;
+    case 'ArrowDown':  case 's': case 'S':             doSlam(); break;
+  }
+});
+
+canvas.addEventListener('touchstart', e => {
+  tx0 = e.touches[0].clientX;
+  ty0 = e.touches[0].clientY;
+  if (gs === 'START') startGame();
+}, { passive: true });
+
+canvas.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tx0;
+  const dy = e.changedTouches[0].clientY - ty0;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (Math.abs(dx) > 28) dx > 0 ? doRight() : doLeft();
+  } else {
+    if      (dy < -28) doJump();
+    else if (dy >  28) doSlam();
+  }
+}, { passive: true });
+
+// ---- Coin Trail Particle System ------------------------------------
+// Faint gold trail on apple when collecting 3+ coins in sequence.
+const coinTrailPS = new BABYLON.ParticleSystem('coinTrail', 32, scene);
+coinTrailPS.particleTexture = new BABYLON.Texture(_ctc.toDataURL(), scene);
+coinTrailPS.emitter         = new BABYLON.Vector3(0, GROUND_Y, 0);
+coinTrailPS.minEmitBox      = new BABYLON.Vector3(-0.15, -0.15, -0.15);
+coinTrailPS.maxEmitBox      = new BABYLON.Vector3(0.15,  0.15,  0.15);
+coinTrailPS.direction1      = new BABYLON.Vector3(-0.5, 0.2, 1.5);
+coinTrailPS.direction2      = new BABYLON.Vector3(0.5,  0.8, 3.0);
+coinTrailPS.minSize         = 0.04; coinTrailPS.maxSize     = 0.12;
+coinTrailPS.minLifeTime     = 0.10; coinTrailPS.maxLifeTime = 0.22;
+coinTrailPS.minEmitPower    = 0.5;  coinTrailPS.maxEmitPower = 1.5;
+coinTrailPS.emitRate        = 0;    // controlled manually
+coinTrailPS.gravity         = new BABYLON.Vector3(0, 1.5, 0);
+coinTrailPS.color1          = new BABYLON.Color4(1.0, 0.90, 0.2, 0.7);
+coinTrailPS.color2          = new BABYLON.Color4(0.95, 0.72, 0.0, 0.4);
+coinTrailPS.colorDead       = new BABYLON.Color4(0.8, 0.55, 0.0, 0);
+coinTrailPS.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+coinTrailPS.start();  // start with emitRate=0; we set rate each frame
+
+let coinStreak     = 0;   // consecutive coins collected
+let coinStreakTimer = 0;  // resets streak after gap
+
+// ---- Speed Lines ---------------------------------------------------
+// Thin planes radiating from a point just ahead of camera, billboard-facing.
+// Only visible above 60% of max speed. Cheap: 12 planes, opacity-driven.
+const SPEEDLINE_COUNT   = 12;
+const SPEEDLINE_THRESH  = 0.60;  // fraction of max speed to start showing
+const speedLines = [];
+
+const matSpeedLine = new BABYLON.StandardMaterial('speedLine', scene);
+matSpeedLine.diffuseColor  = new BABYLON.Color3(1, 1, 1);
+matSpeedLine.emissiveColor = new BABYLON.Color3(0.85, 0.85, 0.88);
+matSpeedLine.backFaceCulling = false;
+matSpeedLine.alpha = 0;
+
+for (let i = 0; i < SPEEDLINE_COUNT; i++) {
+  const angle  = (i / SPEEDLINE_COUNT) * Math.PI * 2;
+  const dist   = 1.8 + Math.random() * 1.4;
+  const len    = 0.9 + Math.random() * 0.8;
+  const sl     = BABYLON.MeshBuilder.CreatePlane('sl_' + i,
+    { width: 0.045, height: len }, scene);
+  sl.material  = matSpeedLine;
+  sl.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+  // Position relative to a forward anchor; we'll update in the loop
+  sl._angle = angle;
+  sl._dist  = dist;
+  sl._len   = len;
+  sl.isPickable = false;
+  speedLines.push(sl);
+}
+
+function updateSpeedLines(dt, spd) {
+  const speedT = (spd - BASE_SPD) / (MAX_SPD - BASE_SPD);
+  const t      = Math.max(0, (speedT - SPEEDLINE_THRESH) / (1 - SPEEDLINE_THRESH));
+  const alpha  = t * 0.38;
+  matSpeedLine.alpha = alpha;
+
+  if (alpha < 0.01) return;
+
+  // Anchor: just in front of camera, centred on player X
+  const anchorX = camera.position.x * 0.3;
+  const anchorY = 2.2;
+  const anchorZ = 4.0;
+
+  for (const sl of speedLines) {
+    // Drift lines toward camera over time for motion blur feel, then wrap
+    sl._angle += dt * (0.18 + t * 0.55);
+    const d = sl._dist;
+    sl.position.set(
+      anchorX + Math.cos(sl._angle) * d,
+      anchorY + Math.sin(sl._angle) * d * 0.55,
+      anchorZ
+    );
+    // Scale length with speed
+    sl.scaling.y = 0.6 + t * 1.2;
+  }
+}
+
+// ---- Camera micro-shake on landing ---------------------------------
+let camShakeT = 0;
+const CAM_SHAKE_DUR = 0.15;
+const CAM_SHAKE_AMP = 0.08;
+
+function triggerCamShake() { camShakeT = CAM_SHAKE_DUR; }
+
+// ---- UI helpers ----------------------------------------------------
+const hudEl       = document.getElementById('hud');
+const scoreEl     = document.getElementById('scoreDisplay');
+const finalScEl   = document.getElementById('finalScore');
+const startScr    = document.getElementById('startScreen');
+const gameOverScr = document.getElementById('gameOverScreen');
+const dangerEl    = document.getElementById('dangerOverlay');
+const grazeFlashEl = document.getElementById('grazeFlash');
+
+document.getElementById('startScreen').addEventListener('click',  startGame);
+document.getElementById('playAgainBtn').addEventListener('click', startGame);
+
+function showHUD()      { hudEl.style.display = 'flex'; }
+function hideHUD()      { hudEl.style.display = 'none';  }
+function updateScore(s) { scoreEl.textContent = Math.floor(s); }
+function setDanger(v)   { dangerEl.style.opacity = v; }
+function triggerGrazeFlash() {
+  grazeFlashEl.classList.remove('active');
+  void grazeFlashEl.offsetWidth; // force reflow to restart animation
+  grazeFlashEl.classList.add('active');
+}
+
+// ---- Game state ----------------------------------------------------
+let gs         = 'START';
+let score      = 0;
+let grazeInvincibleTimer = 0;
+let speed      = BASE_SPD;
+let spawnTimer = 0;
+let spawnIv    = SPAWN_T0;
+let bobT       = 0;
+let coinSpawnTimer = 0;
+
+function startGame() {
+  score      = 0;
+  speed      = BASE_SPD;
+  spawnTimer = 0;
+  spawnIv    = SPAWN_T0;
+  bobT       = 0;
+  muncherT   = 0;
+  grazeInvincibleTimer = 0;
+  coinCount       = 0;
+  coinSpawnTimer  = 0;
+  coinStreak      = 0;
+  coinStreakTimer  = 0;
+  coinTrailPS.emitRate = 0;
+
+  resetPlayer();
+  clearObs();
+  clearCoins();
+  resetTrack();
+  resetChaser();
+  setDanger(0);
+
+  startScr.classList.add('hidden');
+  gameOverScr.classList.add('hidden');
+  showHUD();
+  showCoinHud();
+  updateScore(0);
+  updateCoinHud();
+
+  gs = 'PLAY';
+}
+
+function triggerGameOver() {
+  gs = 'DEAD';
+  hideHUD();
+  hideCoinHud();
+  setDanger(0);
+  finalScEl.textContent = Math.floor(score);
+  gameOverScr.classList.remove('hidden');
+}
+
+// ---- Game loop -----------------------------------------------------
+engine.runRenderLoop(() => {
+  const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
+
+  if (gs === 'PLAY') {
+
+    // Speed ramp
+    speed = Math.min(speed + ACCEL * dt, MAX_SPD);
+
+    // Score: distance-based
+    score += speed * dt * 0.5;
+    updateScore(score);
+
+    // Spawn interval tightens with speed
+    const speedT = (speed - BASE_SPD) / (MAX_SPD - BASE_SPD);
+    spawnIv = SPAWN_T0 - speedT * (SPAWN_T0 - SPAWN_TMIN);
+    spawnTimer += dt;
+    if (spawnTimer >= spawnIv) { spawnObs(); spawnTimer = 0; }
+
+    // Scroll track
+    scrollTrack(dt, speed);
+
+    // Move & cull obstacles
+    for (let i = obsActive.length - 1; i >= 0; i--) {
+      const m = obsActive[i];
+      m.position.z -= speed * dt;
+      if (m.position.z < DESPAWN_Z) despawnObs(m);
+    }
+
+    // Spawn coins (interval: ~2.2s, slightly offset from obstacle timer)
+    coinSpawnTimer += dt;
+    if (coinSpawnTimer >= 2.2) { spawnCoins(); coinSpawnTimer = 0; }
+
+    // Move, spin, collect, and pop-animate coins
+    for (let i = coinActive.length - 1; i >= 0; i--) {
+      const c = coinActive[i];
+      c.position.z -= speed * dt;
+
+      // Spin
+      c._rotY += dt * 3.2;
+      c.rotation.y = c._rotY;
+
+      // Cull
+      if (c.position.z < DESPAWN_Z) { despawnCoin(c); continue; }
+
+      // Pop animation (after collect)
+      if (c._popT > 0) {
+        c._popT -= dt;
+        const sc = 1 + (1 - c._popT / 0.12) * 1.4;
+        c.scaling.setAll(sc);
+        if (c._popT <= 0) { despawnCoin(c); burstCoin(c.position.x, c.position.z); }
+        continue;
+      }
+
+      // Collection check
+      const dx = Math.abs(pPos.x - c.position.x);
+      const dz = Math.abs(c.position.z);
+      if (dx < COIN_RADIUS && dz < COIN_RADIUS) {
+        coinCount++;
+        coinStreak++;
+        coinStreakTimer = 0.55;  // reset gap timer on each collect
+        updateCoinHud();
+        collectCoin(c);
+      }
+    }
+
+    // Coin streak timer — break streak after gap
+    if (coinStreakTimer > 0) {
+      coinStreakTimer -= dt;
+      if (coinStreakTimer <= 0) coinStreak = 0;
+    }
+
+    // Coin trail: emit while streak >= 3
+    coinTrailPS.emitter.set(pPos.x, pPos.y + 0.1, 0);
+    coinTrailPS.emitRate = coinStreak >= 3 ? 28 : 0;
+
+    // Lane switch tween (ease-in-out cubic, 130ms)
+    if (laneTween.p < 1) {
+      laneTween.p = Math.min(1, laneTween.p + dt / LANE_DUR);
+      pPos.x = laneTween.fromX +
+               (laneTween.toX - laneTween.fromX) * easeInOut(laneTween.p);
+      if (laneTween.p === 1) lane.cur = lane.tgt;
+      // Set roll lean toward direction of movement (Z axis = roll in Babylon)
+      const dir = laneTween.toX > laneTween.fromX ? -1 : 1;
+      lean.z = dir * LEAN_LANE_ANG;
+    } else {
+      // Return roll to 0 after switch completes
+      lean.z += (0 - lean.z) * Math.min(1, LEAN_RETURN * dt);
+    }
+
+    // Jump pitch lean (X axis): tilt back on rise, forward on fall
+    if (jumping) {
+      const targetX = velY > 0 ? LEAN_JUMP_UP : LEAN_JUMP_DOWN;
+      lean.x += (targetX - lean.x) * Math.min(1, 12 * dt);
+    } else {
+      lean.x += (0 - lean.x) * Math.min(1, 10 * dt);
+    }
+
+    // Jump physics (split gravity: lighter rise, heavier fall)
+    if (jumping) {
+      const g = velY > 0 ? GRAV_RISE : GRAV_FALL;
+      velY   += g * dt;
+      pPos.y += velY * dt;
+      if (pPos.y <= GROUND_Y) {
+        pPos.y  = GROUND_Y;
+        velY    = 0;
+        jumping = false;
+        squashT = SQUASH_DUR * 0.55;  // lighter squash on natural landing
+        burstDust(pPos.x);
+        triggerCamShake();
+      }
+    }
+
+    // Squash/stretch animation (slam = full, natural landing = softer)
+    bobT += dt;
+    if (squashT > 0) {
+      squashT    -= dt;
+      const p     = Math.max(0, squashT / SQUASH_DUR);
+      const sy    = 1 - p * 0.42;
+      const sx    = 1 + p * 0.24;
+      pBody.scaling.set(sx, sy, sx);
+      pLeaf.scaling.set(0.72 * sx, 0.32 * sy, 0.9 * sx);
+      pStem.scaling.set(sx, sy, sx);
+    } else {
+      pBody.scaling.set(1, 1, 1);
+      pLeaf.scaling.set(0.72, 0.32, 0.9);
+      pStem.scaling.set(1, 1, 1);
+    }
+
+    // Running bob (suppressed during squash to avoid fighting animations)
+    const bob = (jumping || squashT > 0) ? 0 : Math.sin(bobT * 10) * 0.034;
+    pBody.position.set(pPos.x, pPos.y + bob, 0);
+    pBody.rotation.set(lean.x, 0, lean.z);
+    pLeaf.position.set(pPos.x, pPos.y + 0.60 + bob, 0.04);
+    pLeaf.rotation.set(lean.x, 0, lean.z);
+    pStem.position.set(pPos.x, pPos.y + 0.82 + bob, 0.04);
+    pStem.rotation.set(lean.x, 0, lean.z);
+    // Eyes track body with bob
+    pEyeL.position.set(pPos.x - 0.14, pPos.y + 0.10 + bob, -0.42);
+    pEyeR.position.set(pPos.x + 0.14, pPos.y + 0.10 + bob, -0.42);
+    pPupilL.position.set(pPos.x - 0.14, pPos.y + 0.10 + bob, -0.48);
+    pPupilR.position.set(pPos.x + 0.14, pPos.y + 0.10 + bob, -0.48);
+    pEyeL.rotation.set(lean.x, 0, lean.z);
+    pEyeR.rotation.set(lean.x, 0, lean.z);
+    pPupilL.rotation.set(lean.x, 0, lean.z);
+    pPupilR.rotation.set(lean.x, 0, lean.z);
+
+    // Camera follows player X
+    camera.position.x += (pPos.x - camera.position.x) * Math.min(1, 7 * dt);
+
+    // Camera micro-shake on landing (Y bounce, decays over 150ms)
+    let shakeY = 0;
+    if (camShakeT > 0) {
+      camShakeT -= dt;
+      const p  = camShakeT / CAM_SHAKE_DUR;
+      shakeY   = Math.sin(p * Math.PI) * CAM_SHAKE_AMP;
+    }
+    camera.position.y = 7 + shakeY;
+    camera.setTarget(new BABYLON.Vector3(camera.position.x * 0.25, 0.8, 20));
+
+    // Speed lines
+    updateSpeedLines(dt, speed);
+
+    // ---- Chaser: retreats while player runs clean ----
+    chaser.dist = Math.min(CHASER_MAX, chaser.dist + CHASER_RETREAT * dt);
+
+    // ---- Collision resolution ----
+    if (grazeInvincibleTimer > 0) grazeInvincibleTimer -= dt;
+    const hit = checkCollisions();
+    if (hit === 'HIT' && grazeInvincibleTimer <= 0) {
+      triggerGameOver();
+    } else if (hit === 'GRAZE') {
+      if (chaser.grazes >= 1) {
+        // Second graze — caught
+        triggerGameOver();
+      } else {
+        // First graze — monster surges, gold warning flash, one life left
+        chaser.grazes++;
+        chaser.dist = Math.max(2, chaser.dist - CHASER_SURGE1);
+        triggerGrazeFlash();
+        grazeInvincibleTimer = 0.35; // 350ms covers rest of lane-switch tween
+      }
+    }
+
+    // ---- The Muncher: 3D position + animation ----
+    // Camera at z=-11. Muncher scaled 1.3× → eyes at world y≈5.07.
+    // Z range: dist=28 → z=-7.5 (eyes just visible at screen bottom);
+    //          dist=22 (start) → z≈-6.5 (clearly visible, small);
+    //          dist=0  → z=-3  (large and terrifying).
+    // Formula: mZ = -(1.8 + dist/MAX * 4.0)
+    // Range: dist=28(safe) → z≈-5.8 (small, distant); dist=0 → z=-1.8 (close, scary)
+    const dangerT  = Math.max(0, 1 - chaser.dist / CHASER_MAX);
+    const mZ       = -(1.8 + (chaser.dist / CHASER_MAX) * 4.0);
+    muncher.position.set(camera.position.x * 0.3, 1.0, mZ);
+
+    // Jaw animation: chomps faster and wider under pressure
+    muncherT += dt;
+    const jawSpeed = 2.8 + dangerT * 9;
+    const jawAmp   = 0.10 + dangerT * 0.30;
+    const jawAng   = Math.abs(Math.sin(muncherT * jawSpeed)) * jawAmp;
+    mJawU.position.y = 2.88 + jawAng * 1.3;
+    mJawL.position.y = 1.94 - jawAng * 0.9;
+    mMouth.position.y = 2.4 + jawAng * 0.2;
+
+    // Eyes track the player
+    const eyeFollow = pPos.x * 0.09;
+    mEyeL.position.x  = -0.98 + eyeFollow;
+    mEyeR.position.x  =  0.98 + eyeFollow;
+    mPupilL.position.x = -0.98 + eyeFollow;
+    mPupilR.position.x =  0.98 + eyeFollow;
+
+    // Body emissive pulses purple-red with danger
+    matMBody.emissiveColor.set(
+      0.05 + dangerT * 0.24,
+      0.02,
+      0.10 + dangerT * 0.14
+    );
+
+    // Danger overlay: faint from game start, grows strong as chaser closes in.
+    // pow(x, 1.5) gives a curve: barely visible when safe, dramatic when close.
+    const dangerOpacity = Math.pow(1 - chaser.dist / CHASER_MAX, 1.5) * 0.9;
+    setDanger(dangerOpacity);
+
+    if (chaser.dist <= 0) triggerGameOver();
+  }
+
+  scene.render();
+});
+
+window.addEventListener('resize', () => engine.resize());
+</script>
 </body>
 </html>
