@@ -1,0 +1,218 @@
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #0d0d0d;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+#renderCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* ---- HUD ---- */
+#hud {
+  position: fixed;
+  top: 18px; right: 22px;
+  display: none;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+  z-index: 10;
+}
+#hud .label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: #555;
+  text-transform: uppercase;
+}
+#scoreDisplay {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(28px, 5vw, 40px);
+  color: #F5B800;
+  line-height: 1;
+  text-shadow: 0 0 18px rgba(245,184,0,0.5);
+}
+
+/* ---- Overlays ---- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+.overlay.hidden { display: none; }
+
+.overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 60%,
+    rgba(232,32,26,0.09) 0%,
+    rgba(13,13,13,0.88) 55%,
+    rgba(13,13,13,0.96) 100%);
+  z-index: -1;
+}
+
+/* ---- Logo ---- */
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(64px, 16vw, 130px);
+  letter-spacing: 6px;
+  line-height: 1;
+  background: linear-gradient(145deg, #E8201A 0%, #F5B800 55%, #E8201A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 28px rgba(232,32,26,0.42));
+}
+
+/* ---- Decorative line ---- */
+.deco {
+  width: clamp(160px, 36vw, 320px);
+  height: 1.5px;
+  background: linear-gradient(90deg,
+    transparent, #E8201A 30%, #F5B800 50%, #E8201A 70%, transparent);
+  margin: 18px 0 26px;
+}
+
+/* ---- Tap prompt ---- */
+.tap-prompt {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: clamp(14px, 3vw, 20px);
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: #ccc;
+  animation: blink 1.3s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.22; }
+}
+
+/* ---- Controls hint ---- */
+.hint {
+  margin-top: 30px;
+  font-size: clamp(11px, 1.8vw, 13px);
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #3a3a3a;
+  text-align: center;
+  line-height: 2;
+  text-transform: uppercase;
+}
+.hint span { color: #555; }
+
+/* ---- Game Over ---- */
+.gameover-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(52px, 13vw, 100px);
+  letter-spacing: 4px;
+  color: #E8201A;
+  filter: drop-shadow(0 0 22px rgba(232,32,26,0.6));
+  line-height: 1;
+}
+.score-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(11px, 2vw, 15px);
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: #444;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.final-score {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(40px, 10vw, 78px);
+  color: #F5B800;
+  line-height: 1;
+  filter: drop-shadow(0 0 14px rgba(245,184,0,0.48));
+}
+
+.play-btn {
+  margin-top: 38px;
+  padding: 13px 56px;
+  background: linear-gradient(150deg, #E8201A, #b81410);
+  color: #fff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 5px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  box-shadow: 0 4px 28px rgba(232,32,26,0.42),
+              inset 0 1px 0 rgba(255,255,255,0.12);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.play-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 7px 38px rgba(232,32,26,0.62),
+              inset 0 1px 0 rgba(255,255,255,0.12);
+}
+.play-btn:active { transform: scale(0.96); }
+
+/* ---- Coin HUD (top-left) ---- */
+#coinHud {
+  position: fixed;
+  top: 18px; left: 22px;
+  display: none;
+  align-items: center;
+  gap: 7px;
+  pointer-events: none;
+  z-index: 10;
+}
+#coinHud .coin-icon {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffe066, #F5B800 60%, #b88000);
+  box-shadow: 0 0 8px rgba(245,184,0,0.7);
+  flex-shrink: 0;
+}
+#coinCount {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(24px, 4vw, 36px);
+  color: #F5B800;
+  line-height: 1;
+  text-shadow: 0 0 14px rgba(245,184,0,0.55);
+}
+
+/* ---- Graze warning flash (gold edge burst, one-life warning) ---- */
+#grazeFlash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 16;
+  background: radial-gradient(ellipse at 50% 50%,
+    transparent 35%, rgba(245,184,0,0.45) 72%, rgba(245,184,0,0.72) 100%);
+  opacity: 0;
+}
+@keyframes grazeFlashAnim {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+#grazeFlash.active { animation: grazeFlashAnim 0.65s ease-out forwards; }
+
+/* ---- Chaser danger overlay ---- */
+#dangerOverlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  background: radial-gradient(ellipse at 50% 115%,
+    rgba(232,32,26,0.82) 0%,
+    rgba(232,32,26,0.28) 38%,
+    transparent 65%);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
