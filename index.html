@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Dash Blitz</title>
+  <title>Dash BlitZ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/game.css">
@@ -12,32 +12,126 @@
 
 <canvas id="renderCanvas"></canvas>
 
-<!-- HUD -->
+<!-- ================================================================
+     GAMEPLAY HUD (shown during PLAY state only)
+================================================================ -->
 <div id="hud">
   <div class="label">Score</div>
   <div id="scoreDisplay">0</div>
 </div>
 
-<!-- Coin HUD -->
 <div id="coinHud">
   <div class="coin-icon"></div>
   <div id="coinCount">0</div>
 </div>
 
-<!-- Start Screen -->
-<div id="startScreen" class="overlay">
-  <div class="logo">DASH BLITZ</div>
-  <div class="deco"></div>
-  <div class="tap-prompt">Tap to Play</div>
-  <div class="hint">
-    <span>← →</span> Switch lanes &nbsp;&nbsp; <span>↑ / Space</span> Jump &nbsp;&nbsp; <span>↓ / S</span> Slam<br>
-    Swipe left / right / up / down on mobile
+<!-- Pause button (shown during PLAY on mobile) -->
+<button id="pauseBtn" class="pause-btn hidden" aria-label="Pause">⏸</button>
+
+<!-- ================================================================
+     GAMEPLAY FX OVERLAYS (always present, z-index below screens)
+================================================================ -->
+<div id="milestoneText"></div>
+<div id="goldBurst"></div>
+<div id="dangerOverlay"></div>
+<div id="grazeFlash"></div>
+<div id="deathFlash"></div>
+<div id="fadeBlack"></div>
+
+<!-- ================================================================
+     SCREENS (only the active one is visible)
+================================================================ -->
+
+<!-- TITLE SCREEN -->
+<div id="screen-title" class="screen active">
+  <div class="screen-bg-pulse"></div>
+  <div class="title-logo-wrap">
+    <img src="assets/images/logo-white.svg" class="title-logo" alt="Dash BlitZ" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'logo-fallback',textContent:'DASH BLITZ'}))">
   </div>
-  <div id="startBest">BEST: <span id="startBestDist">0</span>m &bull; <span id="startBestCoins">0</span> coins</div>
+  <div class="tap-prompt">TAP TO START</div>
+  <div id="titleBest" class="title-best">BEST: <span id="titleBestDist">0</span>m &bull; <span id="titleBestCoins">0</span> coins</div>
 </div>
 
-<!-- Game Over Screen -->
-<div id="gameOverScreen" class="overlay hidden">
+<!-- MAIN MENU -->
+<div id="screen-main-menu" class="screen">
+  <div class="menu-logo-wrap">
+    <img src="assets/images/logo-white.svg" class="menu-logo" alt="Dash BlitZ" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'logo-fallback-sm',textContent:'DASH BLITZ'}))">
+  </div>
+  <nav class="main-nav">
+    <button class="nav-btn" id="btnPlay">PLAY</button>
+    <button class="nav-btn" id="btnCharacters">CHARACTERS</button>
+    <button class="nav-btn" id="btnWorlds">WORLDS</button>
+    <button class="nav-btn" id="btnShop">SHOP</button>
+    <button class="nav-btn" id="btnLeaderboard">LEADERBOARD</button>
+    <button class="nav-btn" id="btnOptions">OPTIONS</button>
+  </nav>
+  <div class="profile-strip">
+    <span id="profileCoins">0</span> coins &nbsp;&#8226;&nbsp; <span id="profileGames">0</span> games
+  </div>
+</div>
+
+<!-- CHARACTER SELECT -->
+<div id="screen-character-select" class="screen">
+  <div class="screen-title-text">SELECT YOUR DASHER</div>
+  <div class="char-carousel">
+    <button class="carousel-arrow" id="charPrev">&#8592;</button>
+    <div class="char-preview-area">
+      <div class="char-name" id="charName">APPLE</div>
+      <div class="char-lock" id="charLock"></div>
+      <div class="char-cost" id="charCost"></div>
+    </div>
+    <button class="carousel-arrow" id="charNext">&#8594;</button>
+  </div>
+  <div class="screen-actions">
+    <button class="action-btn action-btn--gold" id="charSelectBtn">SELECT</button>
+    <button class="action-btn" id="charUnlockBtn" style="display:none">UNLOCK</button>
+    <button class="action-btn action-btn--dim" id="charBack">BACK</button>
+  </div>
+  <div class="char-coin-balance">&#9733; <span id="charCoinBalance">0</span> coins available</div>
+</div>
+
+<!-- WORLD SELECT -->
+<div id="screen-world-select" class="screen">
+  <div class="screen-title-text">CHOOSE YOUR WORLD</div>
+  <div class="world-grid">
+    <div class="world-card world-card--active" id="worldMarket" data-world="market">
+      <div class="world-color" style="background: linear-gradient(135deg, #E8201A, #0d0d0d)"></div>
+      <div class="world-name">MARKET RUSH</div>
+      <div class="world-desc">Kitchen chaos. Outrun the Muncher.</div>
+      <div class="world-status">UNLOCKED</div>
+    </div>
+    <div class="world-card world-card--locked">
+      <div class="world-color" style="background: linear-gradient(135deg, #1a3a6e, #0d0d0d)"></div>
+      <div class="world-name">NEON CITY</div>
+      <div class="world-desc">Coming soon</div>
+      <div class="world-status">&#128274;</div>
+    </div>
+    <div class="world-card world-card--locked">
+      <div class="world-color" style="background: linear-gradient(135deg, #2d6e1a, #0d0d0d)"></div>
+      <div class="world-name">FOREST RUN</div>
+      <div class="world-desc">Coming soon</div>
+      <div class="world-status">&#128274;</div>
+    </div>
+  </div>
+  <div class="screen-actions">
+    <button class="action-btn action-btn--gold" id="worldDash">DASH!</button>
+    <button class="action-btn action-btn--dim" id="worldBack">BACK</button>
+  </div>
+</div>
+
+<!-- PAUSE -->
+<div id="screen-pause" class="screen screen--glass">
+  <div class="pause-title">PAUSED</div>
+  <div class="pause-nav">
+    <button class="nav-btn nav-btn--sm" id="pauseResume">RESUME</button>
+    <button class="nav-btn nav-btn--sm" id="pauseRestart">RESTART</button>
+    <button class="nav-btn nav-btn--sm" id="pauseOptions">OPTIONS</button>
+    <button class="nav-btn nav-btn--sm" id="pauseMainMenu">MAIN MENU</button>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div id="screen-game-over" class="screen">
   <div class="gameover-title">Game Over</div>
   <div class="deco"></div>
   <div class="score-label">Final Score</div>
@@ -47,26 +141,61 @@
     <div class="go-best">Best score: <span id="goBestDist">0</span> &nbsp;|&nbsp; Best coins: <span id="goBestCoins">0</span></div>
     <div id="newBestBanner" class="hidden">NEW BEST!</div>
   </div>
-  <button class="play-btn" id="playAgainBtn">Play Again</button>
+  <div class="screen-actions screen-actions--row">
+    <button class="play-btn" id="playAgainBtn">PLAY AGAIN</button>
+    <button class="play-btn play-btn--dim" id="goMainMenuBtn">MENU</button>
+  </div>
 </div>
 
-<!-- Milestone flash text -->
-<div id="milestoneText"></div>
-<!-- Gold burst effect for 1000m milestone -->
-<div id="goldBurst"></div>
-<!-- Chaser danger vignette -->
-<div id="dangerOverlay"></div>
+<!-- SHOP -->
+<div id="screen-shop" class="screen">
+  <div class="screen-title-text">SHOP</div>
+  <div class="shop-balance">&#9733; <span id="shopBalance">0</span> coins</div>
+  <div class="shop-grid" id="shopGrid">
+    <!-- populated by JS -->
+  </div>
+  <div class="screen-actions">
+    <button class="action-btn action-btn--dim" id="shopBack">BACK</button>
+  </div>
+</div>
 
-<!-- Graze warning flash -->
-<div id="grazeFlash"></div>
-<!-- Death flash (white) -->
-<div id="deathFlash"></div>
-<!-- Fade to black (death outro) -->
-<div id="fadeBlack"></div>
+<!-- OPTIONS -->
+<div id="screen-options" class="screen">
+  <div class="screen-title-text">OPTIONS</div>
+  <div class="options-list">
+    <div class="option-row">
+      <span class="option-label">MUSIC</span>
+      <button class="toggle-btn" id="toggleMusic" data-on="true">ON</button>
+    </div>
+    <div class="option-row">
+      <span class="option-label">SFX</span>
+      <button class="toggle-btn" id="toggleSfx" data-on="true">ON</button>
+    </div>
+  </div>
+  <div class="screen-actions">
+    <button class="action-btn action-btn--dim" id="optionsBack">BACK</button>
+  </div>
+</div>
+
+<!-- LEADERBOARD -->
+<div id="screen-leaderboard" class="screen">
+  <div class="screen-title-text">LEADERBOARD</div>
+  <div class="lb-section">
+    <div class="lb-label">YOUR PERSONAL BESTS</div>
+    <div class="lb-row"><span>Best Distance</span><span id="lbBestDist">0</span></div>
+    <div class="lb-row"><span>Best Coins</span><span id="lbBestCoins">0</span></div>
+    <div class="lb-row"><span>Total Distance</span><span id="lbTotalDist">0</span></div>
+    <div class="lb-row"><span>Total Coins</span><span id="lbTotalCoins">0</span></div>
+    <div class="lb-row"><span>Games Played</span><span id="lbGames">0</span></div>
+  </div>
+  <div class="lb-global-note">Global leaderboard — coming soon</div>
+  <div class="screen-actions">
+    <button class="action-btn action-btn--dim" id="lbBack">BACK</button>
+  </div>
+</div>
 
 <!-- Babylon.js 7.x -->
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
-
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

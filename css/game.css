@@ -1,3 +1,15 @@
+/* ================================================================
+   DASH BLITZ — Stylesheet
+================================================================ */
+
+@font-face {
+  font-family: 'SpeedBeast';
+  src: url('../assets/fonts/SpeedBeast.otf') format('opentype'),
+       url('../assets/fonts/SpeedBeast.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {
@@ -15,7 +27,540 @@ html, body {
   touch-action: none;
 }
 
-/* ---- HUD ---- */
+/* ================================================================
+   SCREEN SYSTEM
+================================================================ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  padding: 20px;
+}
+.screen.active { display: flex; }
+
+/* Shared dark overlay background for all screens */
+.screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 60%,
+    rgba(232,32,26,0.07) 0%,
+    rgba(13,13,13,0.82) 50%,
+    rgba(13,13,13,0.94) 100%);
+  z-index: -1;
+}
+
+/* Glass effect (pause screen only) */
+.screen--glass::before {
+  background: rgba(13,13,13,0.75);
+  backdrop-filter: blur(8px);
+}
+
+/* ================================================================
+   TITLE SCREEN
+================================================================ */
+
+.screen-bg-pulse {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 110%, rgba(232,32,26,0.18) 0%, transparent 65%);
+  animation: bgPulse 3s ease-in-out infinite alternate;
+  z-index: -1;
+}
+@keyframes bgPulse {
+  from { opacity: 0.5; }
+  to   { opacity: 1;   }
+}
+
+.title-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.title-logo {
+  max-width: min(62vw, 420px);
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 0 32px rgba(232,32,26,0.45));
+}
+
+.logo-fallback {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(64px, 16vw, 130px);
+  letter-spacing: 6px;
+  background: linear-gradient(145deg, #E8201A 0%, #F5B800 55%, #E8201A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 28px rgba(232,32,26,0.42));
+}
+
+.logo-fallback-sm {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(32px, 8vw, 64px);
+  letter-spacing: 4px;
+  background: linear-gradient(145deg, #E8201A 0%, #F5B800 55%, #E8201A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.tap-prompt {
+  font-family: 'SpeedBeast', 'Bebas Neue', sans-serif;
+  font-size: clamp(14px, 3.5vw, 22px);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: #ccc;
+  animation: blink 1.3s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.22; }
+}
+
+.title-best {
+  margin-top: 22px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(11px, 2vw, 14px);
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: #333;
+  text-transform: uppercase;
+}
+.title-best span { color: #555; }
+
+/* ================================================================
+   MAIN MENU
+================================================================ */
+
+.menu-logo-wrap {
+  margin-bottom: 32px;
+}
+.menu-logo {
+  max-width: min(32vw, 220px);
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 0 16px rgba(232,32,26,0.35));
+}
+
+.main-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(320px, 80vw);
+}
+
+.nav-btn {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(16px, 3.5vw, 22px);
+  font-weight: 700;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: #888;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  padding: 10px 18px;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.12s, border-color 0.12s, padding-left 0.12s;
+}
+.nav-btn:hover, .nav-btn:focus {
+  color: #F5B800;
+  border-left-color: #E8201A;
+  padding-left: 26px;
+  outline: none;
+}
+.nav-btn:active { color: #E8201A; }
+
+.nav-btn--sm {
+  font-size: clamp(14px, 3vw, 18px);
+  padding: 8px 16px;
+}
+
+.profile-strip {
+  margin-top: 24px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(11px, 2vw, 13px);
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #2a2a2a;
+  text-transform: uppercase;
+}
+
+/* ================================================================
+   SHARED SCREEN COMPONENTS
+================================================================ */
+
+.screen-title-text {
+  font-family: 'SpeedBeast', 'Bebas Neue', sans-serif;
+  font-size: clamp(28px, 7vw, 52px);
+  letter-spacing: 5px;
+  color: #F5B800;
+  filter: drop-shadow(0 0 14px rgba(245,184,0,0.4));
+  margin-bottom: 28px;
+  text-transform: uppercase;
+}
+
+.screen-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+.screen-actions--row {
+  flex-direction: row;
+  gap: 14px;
+}
+
+.action-btn {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(16px, 3.5vw, 22px);
+  letter-spacing: 5px;
+  padding: 10px 40px;
+  background: linear-gradient(150deg, #E8201A, #b81410);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  box-shadow: 0 4px 22px rgba(232,32,26,0.38),
+              inset 0 1px 0 rgba(255,255,255,0.10);
+  transition: transform 0.08s, box-shadow 0.08s, opacity 0.08s;
+  min-width: 160px;
+}
+.action-btn:hover  { transform: scale(1.04); box-shadow: 0 6px 32px rgba(232,32,26,0.55), inset 0 1px 0 rgba(255,255,255,0.10); }
+.action-btn:active { transform: scale(0.96); }
+.action-btn--gold  { background: linear-gradient(150deg, #d4a200, #a37a00); box-shadow: 0 4px 22px rgba(245,184,0,0.35); }
+.action-btn--gold:hover { box-shadow: 0 6px 32px rgba(245,184,0,0.55); }
+.action-btn--dim   { background: rgba(40,40,44,0.85); color: #666; box-shadow: none; }
+.action-btn--dim:hover { color: #aaa; }
+.action-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+
+/* ================================================================
+   CHARACTER SELECT
+================================================================ */
+
+.char-carousel {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 8px;
+}
+
+.carousel-arrow {
+  font-size: 28px;
+  background: none;
+  border: none;
+  color: #444;
+  cursor: pointer;
+  padding: 8px 12px;
+  transition: color 0.12s;
+  font-family: 'Rajdhani', sans-serif;
+}
+.carousel-arrow:hover { color: #F5B800; }
+
+.char-preview-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 180px;
+  /* The 3D character preview is in the Babylon canvas below; this shows metadata */
+}
+
+.char-name {
+  font-family: 'SpeedBeast', 'Bebas Neue', sans-serif;
+  font-size: clamp(26px, 6vw, 42px);
+  letter-spacing: 5px;
+  color: #F5B800;
+  margin-bottom: 6px;
+}
+
+.char-lock {
+  font-size: clamp(28px, 5vw, 38px);
+  line-height: 1;
+  min-height: 40px;
+}
+
+.char-cost {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(12px, 2.5vw, 16px);
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #F5B800;
+  min-height: 22px;
+}
+
+.char-coin-balance {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(11px, 2vw, 14px);
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #444;
+  text-transform: uppercase;
+  margin-top: 10px;
+}
+
+/* ================================================================
+   WORLD SELECT
+================================================================ */
+
+.world-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  max-width: 540px;
+  margin-bottom: 8px;
+}
+
+.world-card {
+  width: clamp(130px, 28vw, 160px);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, transform 0.12s;
+  background: #111;
+}
+.world-card--active { cursor: pointer; }
+.world-card--locked { opacity: 0.42; cursor: default; }
+.world-card.selected, .world-card--active:hover { border-color: #F5B800; transform: scale(1.03); }
+
+.world-color { height: 70px; }
+
+.world-name {
+  font-family: 'SpeedBeast', 'Bebas Neue', sans-serif;
+  font-size: clamp(13px, 3vw, 18px);
+  letter-spacing: 3px;
+  color: #eee;
+  padding: 8px 10px 2px;
+}
+
+.world-desc {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(10px, 1.8vw, 12px);
+  color: #555;
+  padding: 0 10px 4px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.world-status {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(10px, 1.8vw, 12px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #3a8a3a;
+  padding: 2px 10px 8px;
+  text-transform: uppercase;
+}
+.world-card--locked .world-status { color: #555; }
+
+/* ================================================================
+   PAUSE SCREEN
+================================================================ */
+
+.pause-title {
+  font-family: 'SpeedBeast', 'Bebas Neue', sans-serif;
+  font-size: clamp(36px, 9vw, 70px);
+  letter-spacing: 6px;
+  color: #E8201A;
+  filter: drop-shadow(0 0 18px rgba(232,32,26,0.5));
+  margin-bottom: 28px;
+}
+
+.pause-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(280px, 75vw);
+}
+
+/* ================================================================
+   GAME OVER SCREEN (replaces old .overlay)
+================================================================ */
+
+#screen-game-over .gameover-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(52px, 13vw, 100px);
+  letter-spacing: 4px;
+  color: #E8201A;
+  filter: drop-shadow(0 0 22px rgba(232,32,26,0.6));
+  line-height: 1;
+}
+
+/* ================================================================
+   SHOP
+================================================================ */
+
+.shop-balance {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(14px, 3vw, 20px);
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #F5B800;
+  margin-bottom: 18px;
+  text-transform: uppercase;
+}
+
+.shop-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  max-width: 480px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.shop-card {
+  width: clamp(110px, 24vw, 140px);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.shop-card:hover { border-color: #F5B800; background: rgba(245,184,0,0.06); }
+.shop-card--owned { border-color: #2a6a2a; cursor: default; }
+.shop-card--owned:hover { border-color: #2a6a2a; background: transparent; }
+
+.shop-card-name {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(11px, 2.2vw, 14px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #aaa;
+  text-transform: uppercase;
+}
+
+.shop-card-cost {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(14px, 3vw, 18px);
+  letter-spacing: 2px;
+  color: #F5B800;
+}
+
+.shop-card-status {
+  font-size: clamp(9px, 1.8vw, 11px);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #3a8a3a;
+}
+
+/* ================================================================
+   OPTIONS
+================================================================ */
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(280px, 78vw);
+  margin-bottom: 8px;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding-bottom: 14px;
+}
+
+.option-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(14px, 3vw, 18px);
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.toggle-btn {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(13px, 2.5vw, 16px);
+  letter-spacing: 3px;
+  padding: 6px 20px;
+  background: rgba(245,184,0,0.12);
+  color: #F5B800;
+  border: 1px solid rgba(245,184,0,0.3);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.1s;
+  min-width: 70px;
+}
+.toggle-btn[data-on="false"] {
+  background: rgba(60,60,64,0.5);
+  color: #444;
+  border-color: rgba(255,255,255,0.08);
+}
+.toggle-btn:hover { background: rgba(245,184,0,0.22); }
+
+/* ================================================================
+   LEADERBOARD
+================================================================ */
+
+.lb-section {
+  width: min(340px, 85vw);
+  margin-bottom: 14px;
+}
+
+.lb-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(10px, 2vw, 13px);
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #333;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.lb-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  padding: 9px 0;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(12px, 2.5vw, 15px);
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.lb-row span:first-child { color: #444; }
+.lb-row span:last-child  { color: #F5B800; }
+
+.lb-global-note {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(10px, 1.8vw, 12px);
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #2a2a2a;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+/* ================================================================
+   HUD (gameplay)
+================================================================ */
+
 #hud {
   position: fixed;
   top: 18px; right: 22px;
@@ -41,43 +586,136 @@ html, body {
   text-shadow: 0 0 18px rgba(245,184,0,0.5);
 }
 
-/* ---- Overlays ---- */
-.overlay {
+#coinHud {
   position: fixed;
-  inset: 0;
+  top: 18px; left: 22px;
+  display: none;
+  align-items: center;
+  gap: 7px;
+  pointer-events: none;
+  z-index: 10;
+}
+#coinHud .coin-icon {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffe066, #F5B800 60%, #b88000);
+  box-shadow: 0 0 8px rgba(245,184,0,0.7);
+  flex-shrink: 0;
+}
+#coinCount {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(24px, 4vw, 36px);
+  color: #F5B800;
+  line-height: 1;
+  text-shadow: 0 0 14px rgba(245,184,0,0.55);
+}
+
+.pause-btn {
+  position: fixed;
+  top: 16px; left: 22px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #666;
+  font-size: 18px;
+  width: 38px; height: 38px;
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 10;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 20;
+  transition: color 0.1s, background 0.1s;
 }
-.overlay.hidden { display: none; }
+.pause-btn:hover { color: #aaa; background: rgba(0,0,0,0.65); }
 
-.overlay::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 60%,
-    rgba(232,32,26,0.09) 0%,
-    rgba(13,13,13,0.88) 55%,
-    rgba(13,13,13,0.96) 100%);
-  z-index: -1;
+/* ================================================================
+   GAMEPLAY OVERLAYS (fx, always present)
+================================================================ */
+
+#grazeFlash {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 16;
+  background: radial-gradient(ellipse at 50% 50%,
+    transparent 35%, rgba(245,184,0,0.45) 72%, rgba(245,184,0,0.72) 100%);
+  opacity: 0;
+}
+@keyframes grazeFlashAnim {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+#grazeFlash.active { animation: grazeFlashAnim 0.65s ease-out forwards; }
+
+#dangerOverlay {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  background: radial-gradient(ellipse at 50% 115%,
+    rgba(232,32,26,0.82) 0%,
+    rgba(232,32,26,0.28) 38%,
+    transparent 65%);
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
-/* ---- Logo ---- */
-.logo {
+#deathFlash {
+  position: fixed; inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+#deathFlash.active { animation: deathFlashAnim 0.25s ease-out forwards; }
+@keyframes deathFlashAnim {
+  0%   { opacity: 0; }
+  20%  { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+#fadeBlack {
+  position: fixed; inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 25;
+  transition: opacity 0.3s ease-out;
+}
+
+#milestoneText {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateX(-110%) translateY(-50%);
   font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(64px, 16vw, 130px);
+  font-size: clamp(24px, 5.5vw, 44px);
   letter-spacing: 6px;
-  line-height: 1;
-  background: linear-gradient(145deg, #E8201A 0%, #F5B800 55%, #E8201A 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: drop-shadow(0 0 28px rgba(232,32,26,0.42));
+  color: #F5B800;
+  filter: drop-shadow(0 0 14px rgba(245,184,0,0.55));
+  pointer-events: none;
+  z-index: 18;
+  padding: 0 28px;
+  transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+#milestoneText.slide-in  { transform: translateX(0) translateY(-50%); }
+#milestoneText.slide-out { transform: translateX(110%) translateY(-50%); transition: transform 0.35s cubic-bezier(0.55, 0, 0.9, 0.5); }
+
+#goldBurst {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 17;
+  opacity: 0;
+}
+#goldBurst.active { animation: goldBurstAnim 1.0s ease-out forwards; }
+@keyframes goldBurstAnim {
+  0%   { opacity: 1; box-shadow: inset 0 0 0px rgba(245,184,0,0); }
+  25%  { box-shadow: inset 0 0 80px rgba(245,184,0,0.55); }
+  100% { box-shadow: inset 0 0 0px rgba(245,184,0,0); opacity: 0; }
 }
 
-/* ---- Decorative line ---- */
+/* ================================================================
+   SHARED / GAME OVER COMPONENTS
+================================================================ */
+
 .deco {
   width: clamp(160px, 36vw, 320px);
   height: 1.5px;
@@ -86,55 +724,6 @@ html, body {
   margin: 18px 0 26px;
 }
 
-/* ---- Tap prompt ---- */
-.tap-prompt {
-  font-family: 'Rajdhani', sans-serif;
-  font-weight: 700;
-  font-size: clamp(14px, 3vw, 20px);
-  letter-spacing: 5px;
-  text-transform: uppercase;
-  color: #ccc;
-  animation: blink 1.3s ease-in-out infinite;
-}
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.22; }
-}
-
-/* ---- Controls hint ---- */
-.hint {
-  margin-top: 30px;
-  font-size: clamp(11px, 1.8vw, 13px);
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: #3a3a3a;
-  text-align: center;
-  line-height: 2;
-  text-transform: uppercase;
-}
-.hint span { color: #555; }
-
-/* ---- Start screen high score ---- */
-#startBest {
-  margin-top: 18px;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: clamp(11px, 2vw, 14px);
-  font-weight: 600;
-  letter-spacing: 3px;
-  color: #333;
-  text-transform: uppercase;
-}
-#startBest span { color: #555; }
-
-/* ---- Game Over ---- */
-.gameover-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(52px, 13vw, 100px);
-  letter-spacing: 4px;
-  color: #E8201A;
-  filter: drop-shadow(0 0 22px rgba(232,32,26,0.6));
-  line-height: 1;
-}
 .score-label {
   font-family: 'Rajdhani', sans-serif;
   font-size: clamp(11px, 2vw, 15px);
@@ -152,7 +741,6 @@ html, body {
   filter: drop-shadow(0 0 14px rgba(245,184,0,0.48));
 }
 
-/* ---- Game Over stats section ---- */
 .go-stats {
   display: flex;
   flex-direction: column;
@@ -178,6 +766,7 @@ html, body {
   text-transform: uppercase;
 }
 .go-best span { color: #666; }
+
 #newBestBanner {
   font-family: 'Bebas Neue', sans-serif;
   font-size: clamp(18px, 3.5vw, 26px);
@@ -191,10 +780,9 @@ html, body {
   from { opacity: 0.7; }
   to   { opacity: 1; }
 }
-.hidden { display: none !important; }
 
 .play-btn {
-  margin-top: 38px;
+  margin-top: 16px;
   padding: 13px 56px;
   background: linear-gradient(150deg, #E8201A, #b81410);
   color: #fff;
@@ -208,131 +796,9 @@ html, body {
               inset 0 1px 0 rgba(255,255,255,0.12);
   transition: transform 0.08s, box-shadow 0.08s;
 }
-.play-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 7px 38px rgba(232,32,26,0.62),
-              inset 0 1px 0 rgba(255,255,255,0.12);
-}
+.play-btn:hover  { transform: scale(1.05); box-shadow: 0 7px 38px rgba(232,32,26,0.62), inset 0 1px 0 rgba(255,255,255,0.12); }
 .play-btn:active { transform: scale(0.96); }
+.play-btn--dim   { background: rgba(40,40,44,0.85); color: #666; box-shadow: none; margin-top: 16px; }
+.play-btn--dim:hover { color: #aaa; }
 
-/* ---- Coin HUD (top-left) ---- */
-#coinHud {
-  position: fixed;
-  top: 18px; left: 22px;
-  display: none;
-  align-items: center;
-  gap: 7px;
-  pointer-events: none;
-  z-index: 10;
-}
-#coinHud .coin-icon {
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #ffe066, #F5B800 60%, #b88000);
-  box-shadow: 0 0 8px rgba(245,184,0,0.7);
-  flex-shrink: 0;
-}
-#coinCount {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(24px, 4vw, 36px);
-  color: #F5B800;
-  line-height: 1;
-  text-shadow: 0 0 14px rgba(245,184,0,0.55);
-}
-
-
-/* ---- Graze warning flash (gold edge burst, one-life warning) ---- */
-#grazeFlash {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 16;
-  background: radial-gradient(ellipse at 50% 50%,
-    transparent 35%, rgba(245,184,0,0.45) 72%, rgba(245,184,0,0.72) 100%);
-  opacity: 0;
-}
-@keyframes grazeFlashAnim {
-  0%   { opacity: 1; }
-  100% { opacity: 0; }
-}
-#grazeFlash.active { animation: grazeFlashAnim 0.65s ease-out forwards; }
-
-/* ---- Chaser danger overlay ---- */
-#dangerOverlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 15;
-  background: radial-gradient(ellipse at 50% 115%,
-    rgba(232,32,26,0.82) 0%,
-    rgba(232,32,26,0.28) 38%,
-    transparent 65%);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-/* ---- Milestone flash text ---- */
-#milestoneText {
-  position: fixed;
-  top: 50%;
-  left: 0;
-  transform: translateX(-110%) translateY(-50%);
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(24px, 5.5vw, 44px);
-  letter-spacing: 6px;
-  color: #F5B800;
-  filter: drop-shadow(0 0 14px rgba(245,184,0,0.55));
-  pointer-events: none;
-  z-index: 18;
-  padding: 0 28px;
-  transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-#milestoneText.slide-in {
-  transform: translateX(0) translateY(-50%);
-}
-#milestoneText.slide-out {
-  transform: translateX(110%) translateY(-50%);
-  transition: transform 0.35s cubic-bezier(0.55, 0, 0.9, 0.5);
-}
-
-/* ---- Gold burst (1000m) ---- */
-#goldBurst {
-  position: fixed; inset: 0;
-  pointer-events: none;
-  z-index: 17;
-  opacity: 0;
-}
-#goldBurst.active {
-  animation: goldBurstAnim 1.0s ease-out forwards;
-}
-@keyframes goldBurstAnim {
-  0%   { opacity: 1; box-shadow: inset 0 0 0px rgba(245,184,0,0); }
-  25%  { box-shadow: inset 0 0 80px rgba(245,184,0,0.55); }
-  100% { box-shadow: inset 0 0 0px rgba(245,184,0,0); opacity: 0; }
-}
-
-/* ---- Death sequence overlays ---- */
-#deathFlash {
-  position: fixed; inset: 0;
-  background: #fff;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 30;
-}
-#deathFlash.active {
-  animation: deathFlashAnim 0.25s ease-out forwards;
-}
-@keyframes deathFlashAnim {
-  0%   { opacity: 0; }
-  20%  { opacity: 0.85; }
-  100% { opacity: 0; }
-}
-
-#fadeBlack {
-  position: fixed; inset: 0;
-  background: #000;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 25;
-  transition: opacity 0.3s ease-out;
-}
+.hidden { display: none !important; }
