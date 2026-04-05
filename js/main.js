@@ -24,6 +24,7 @@ import { saveHighScore, getHighScore, addRunStats, getTotalStats,
 import { CHARACTERS } from './characters/index.js';
 import { initScreens, showScreen, hideAllScreens, getCurrentScreen } from './ui/screens.js';
 import { initMenu, showPauseScreen } from './ui/menu.js';
+import { World } from './world.js';
 
 // ---- Engine & Scene ------------------------------------------------
 const canvas = document.getElementById('renderCanvas');
@@ -71,7 +72,7 @@ matTrack.specularColor = new BABYLON.Color3(0.04, 0.04, 0.06);
 
 const matEdge = new BABYLON.StandardMaterial('edge', scene);
 matEdge.diffuseColor  = new BABYLON.Color3(0.9, 0.08, 0.04);
-matEdge.emissiveColor = new BABYLON.Color3(0.68, 0.04, 0.02);
+matEdge.emissiveColor = new BABYLON.Color3(0.20, 0.012, 0.006);  // 30% of original
 
 const matDiv = new BABYLON.StandardMaterial('div', scene);
 matDiv.diffuseColor  = new BABYLON.Color3(0.14, 0.14, 0.18);
@@ -132,6 +133,7 @@ initPlayer(scene);
 initObstacles(scene);
 initCoins(scene);
 initMuncher(scene);
+const world = new World(scene);
 
 // Restore saved character
 (function() {
@@ -228,6 +230,7 @@ function startGame() {
   clearObs();
   resetCoins();
   resetTrack();
+  world.reset();
   resetChaser();
   hud.setDanger(0);
   hud.setFadeBlack(0);
@@ -402,6 +405,7 @@ engine.runRenderLoop(() => {
 
     // Track scroll
     scrollTrack(dt, speed);
+    world.update(dt, speed);
 
     // Move & cull obstacles
     for (let i = obsActive.length - 1; i >= 0; i--) {
