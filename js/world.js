@@ -4,7 +4,7 @@
 import { TRACK_W, DESPAWN_Z } from './config.js';
 
 const TRACK_HALF_W = TRACK_W / 2;       // 3.6
-const STALL_X      = TRACK_HALF_W + 1.8; // 5.4
+const STALL_X      = TRACK_HALF_W + 2.6; // 6.2
 const STALL_N      = 3;                  // per side
 const STALL_GAP    = 18;                 // Z units between stalls
 const STALL_WRAP   = STALL_N * STALL_GAP; // 54 — wrap cycle
@@ -49,14 +49,19 @@ export class World {
   // ---- Private setup -----------------------------------------------
 
   _restyle() {
-    // Change existing track tiles (gt0–gt15) to warm cream
-    const mat = new BABYLON.StandardMaterial('floorCream', this._scene);
-    mat.diffuseColor  = new BABYLON.Color3(0.910, 0.835, 0.690); // #e8d5b0
-    mat.specularColor = new BABYLON.Color3(0.03, 0.02, 0.01);
+    // Two-tone checkerboard on existing track tiles (gt0–gt15)
+    // #d4b896 = 212,184,150  #c4a882 = 196,168,130
+    const matA = new BABYLON.StandardMaterial('floorA', this._scene);
+    matA.diffuseColor  = new BABYLON.Color3(0.831, 0.722, 0.588); // #d4b896
+    matA.specularColor = new BABYLON.Color3(0.02, 0.015, 0.01);
+
+    const matB = new BABYLON.StandardMaterial('floorB', this._scene);
+    matB.diffuseColor  = new BABYLON.Color3(0.769, 0.659, 0.510); // #c4a882
+    matB.specularColor = new BABYLON.Color3(0.02, 0.015, 0.01);
 
     for (let i = 0; i < 16; i++) {
       const tile = this._scene.getMeshByName('gt' + i);
-      if (tile) tile.material = mat;
+      if (tile) tile.material = i % 2 === 0 ? matA : matB;
     }
   }
 
@@ -97,15 +102,15 @@ export class World {
   }
 
   _buildStall(node, matTable, canopyHex) {
-    // Table top
+    // Table top — bottom at Y=0.1, center at Y=0.175 (height 0.15)
     const tbl = BABYLON.MeshBuilder.CreateBox(node.name + '_tbl',
       { width: 2.5, height: 0.15, depth: 1.2 }, this._scene);
     tbl.material  = matTable;
-    tbl.position.set(0, 0.4, 0);
+    tbl.position.set(0, 0.175, 0);
     tbl.parent    = node;
     tbl.isPickable = false;
 
-    // Canopy
+    // Canopy — flat slab at Y=2.0
     const cc = BABYLON.Color3.FromHexString(canopyHex);
     const matCan = new BABYLON.StandardMaterial(node.name + '_can', this._scene);
     matCan.diffuseColor  = cc;
@@ -114,7 +119,7 @@ export class World {
     const can = BABYLON.MeshBuilder.CreateBox(node.name + '_can_m',
       { width: 3.0, height: 0.1, depth: 1.5 }, this._scene);
     can.material  = matCan;
-    can.position.set(0, 2.2, 0);
+    can.position.set(0, 2.0, 0);
     can.parent    = node;
     can.isPickable = false;
   }
