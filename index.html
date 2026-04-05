@@ -171,6 +171,31 @@
     }
     .play-btn:active { transform: scale(0.96); }
 
+    /* ---- Coin HUD (top-left) ---- */
+    #coinHud {
+      position: fixed;
+      top: 18px; left: 22px;
+      display: none;
+      align-items: center;
+      gap: 7px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #coinHud .coin-icon {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ffe066, #F5B800 60%, #b88000);
+      box-shadow: 0 0 8px rgba(245,184,0,0.7);
+      flex-shrink: 0;
+    }
+    #coinCount {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(24px, 4vw, 36px);
+      color: #F5B800;
+      line-height: 1;
+      text-shadow: 0 0 14px rgba(245,184,0,0.55);
+    }
+
     /* ---- Graze warning flash (gold edge burst, one-life warning) ---- */
     #grazeFlash {
       position: fixed;
@@ -211,6 +236,12 @@
 <div id="hud">
   <div class="label">Score</div>
   <div id="scoreDisplay">0</div>
+</div>
+
+<!-- Coin HUD -->
+<div id="coinHud">
+  <div class="coin-icon"></div>
+  <div id="coinCount">0</div>
 </div>
 
 <!-- Start Screen -->
@@ -537,6 +568,139 @@ function clearObs() {
   while (obsActive.length) despawnObs(obsActive[0]);
 }
 
+// ---- Coin Pool -----------------------------------------------------
+const COIN_POOL_SZ  = 20;
+const COIN_SPAWN_Z  = SPAWN_Z;
+const COIN_RADIUS   = 0.8;   // collect radius (generous / magnetic)
+
+const matCoin = new BABYLON.PBRMaterial('coin', scene);
+matCoin.albedoColor          = new BABYLON.Color3(1.0, 0.82, 0.10);
+matCoin.metallic             = 0.85;
+matCoin.roughness            = 0.18;
+matCoin.emissiveColor        = new BABYLON.Color3(0.55, 0.38, 0.0);
+matCoin.environmentIntensity = 0.4;
+
+const coinTpl = BABYLON.MeshBuilder.CreateTorus('coin_tpl',
+  { diameter: 0.52, thickness: 0.18, tessellation: 20 }, scene);
+coinTpl.material  = matCoin;
+coinTpl.isVisible = false;
+
+const coinPool   = [];
+const coinActive = [];
+let   coinCount  = 0;
+
+// Coin canvas texture for particle burst (gold gradient)
+const _ctc  = document.createElement('canvas');
+_ctc.width  = _ctc.height = 32;
+const _cctx = _ctc.getContext('2d');
+const _cgr  = _cctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+_cgr.addColorStop(0,   'rgba(255,235,100,1)');
+_cgr.addColorStop(0.5, 'rgba(245,184,0,0.7)');
+_cgr.addColorStop(1,   'rgba(200,140,0,0)');
+_cctx.fillStyle = _cgr;
+_cctx.beginPath(); _cctx.arc(16, 16, 16, 0, Math.PI * 2); _cctx.fill();
+
+const coinPS = new BABYLON.ParticleSystem('coinPS', 24, scene);
+coinPS.particleTexture = new BABYLON.Texture(_ctc.toDataURL(), scene);
+coinPS.emitter         = new BABYLON.Vector3(0, GROUND_Y + 0.5, 0);
+coinPS.minEmitBox      = new BABYLON.Vector3(-0.1, 0, -0.1);
+coinPS.maxEmitBox      = new BABYLON.Vector3(0.1, 0, 0.1);
+coinPS.direction1      = new BABYLON.Vector3(-2, 3, -2);
+coinPS.direction2      = new BABYLON.Vector3(2, 6, 2);
+coinPS.minSize         = 0.05; coinPS.maxSize     = 0.16;
+coinPS.minLifeTime     = 0.15; coinPS.maxLifeTime = 0.35;
+coinPS.minEmitPower    = 2.0;  coinPS.maxEmitPower = 5.0;
+coinPS.emitRate        = 0;
+coinPS.gravity         = new BABYLON.Vector3(0, -12, 0);
+coinPS.color1          = new BABYLON.Color4(1.0, 0.92, 0.2, 1);
+coinPS.color2          = new BABYLON.Color4(0.95, 0.72, 0.0, 0.8);
+coinPS.colorDead       = new BABYLON.Color4(0.8, 0.55, 0.0, 0);
+coinPS.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+
+function burstCoin(x, z) {
+  coinPS.emitter.set(x, GROUND_Y + 0.5, z);
+  coinPS.manualEmitCount = 14;
+  coinPS.start();
+}
+
+for (let i = 0; i < COIN_POOL_SZ; i++) {
+  const inst      = coinTpl.createInstance('coin_' + i);
+  inst.isVisible  = false;
+  inst._active    = false;
+  inst._popT      = 0;   // pop-scale animation countdown
+  inst._rotY      = Math.random() * Math.PI * 2;
+  coinPool.push(inst);
+}
+
+// Spawn a group of coins — up to 3 in a row in one lane, or scattered
+function spawnCoins() {
+  const pattern = Math.random();
+  let plan;
+  if (pattern < 0.4) {
+    // 3 in a row in one lane
+    const l = Math.floor(Math.random() * 3);
+    plan = [
+      { lane: l, zOff: 0 },
+      { lane: l, zOff: 2.2 },
+      { lane: l, zOff: 4.4 },
+    ];
+  } else if (pattern < 0.75) {
+    // 2 scattered
+    const l1 = Math.floor(Math.random() * 3);
+    let l2   = Math.floor(Math.random() * 3);
+    if (l2 === l1) l2 = (l2 + 1) % 3;
+    plan = [
+      { lane: l1, zOff: 0 },
+      { lane: l2, zOff: 1.8 },
+    ];
+  } else {
+    // 1 coin
+    plan = [{ lane: Math.floor(Math.random() * 3), zOff: 0 }];
+  }
+
+  for (const p of plan) {
+    // Overlap check: reject if any active obstacle is within 1.2 Z of this coin
+    const cx = LANE_X[p.lane];
+    const cz = COIN_SPAWN_Z - p.zOff;
+    const blocked = obsActive.some(
+      o => Math.abs(o.position.x - cx) < 1.0 && Math.abs(o.position.z - cz) < 1.2
+    );
+    if (blocked) continue;
+
+    const m = coinPool.find(c => !c._active);
+    if (!m) continue;
+    m.position.set(cx, GROUND_Y + 0.52, cz);
+    m.isVisible  = true;
+    m._active    = true;
+    m._popT      = 0;
+    coinActive.push(m);
+  }
+}
+
+function collectCoin(m) {
+  // Pop animation: scale up briefly, then hide
+  m._popT = 0.12;
+}
+
+function despawnCoin(m) {
+  m.isVisible  = false;
+  m._active    = false;
+  m.scaling.setAll(1);
+  m.position.z = COIN_SPAWN_Z + 200;
+  const i = coinActive.indexOf(m);
+  if (i >= 0) coinActive.splice(i, 1);
+}
+
+function clearCoins() {
+  while (coinActive.length) despawnCoin(coinActive[0]);
+}
+
+const coinHudEl  = document.getElementById('coinHud');
+const coinCountEl = document.getElementById('coinCount');
+function showCoinHud()    { coinHudEl.style.display = 'flex'; }
+function hideCoinHud()    { coinHudEl.style.display = 'none'; }
+function updateCoinHud()  { coinCountEl.textContent = coinCount; }
+
 // ---- Collision detection -------------------------------------------
 // Returns 'HIT' (head-on → instant death),
 //         'GRAZE' (side clip → chaser surges),
@@ -759,6 +923,7 @@ let speed      = BASE_SPD;
 let spawnTimer = 0;
 let spawnIv    = SPAWN_T0;
 let bobT       = 0;
+let coinSpawnTimer = 0;
 
 function startGame() {
   score      = 0;
@@ -768,9 +933,12 @@ function startGame() {
   bobT       = 0;
   muncherT   = 0;
   grazeInvincibleTimer = 0;
+  coinCount  = 0;
+  coinSpawnTimer = 0;
 
   resetPlayer();
   clearObs();
+  clearCoins();
   resetTrack();
   resetChaser();
   setDanger(0);
@@ -778,7 +946,9 @@ function startGame() {
   startScr.classList.add('hidden');
   gameOverScr.classList.add('hidden');
   showHUD();
+  showCoinHud();
   updateScore(0);
+  updateCoinHud();
 
   gs = 'PLAY';
 }
@@ -786,6 +956,7 @@ function startGame() {
 function triggerGameOver() {
   gs = 'DEAD';
   hideHUD();
+  hideCoinHud();
   setDanger(0);
   finalScEl.textContent = Math.floor(score);
   gameOverScr.classList.remove('hidden');
@@ -818,6 +989,41 @@ engine.runRenderLoop(() => {
       const m = obsActive[i];
       m.position.z -= speed * dt;
       if (m.position.z < DESPAWN_Z) despawnObs(m);
+    }
+
+    // Spawn coins (interval: ~2.2s, slightly offset from obstacle timer)
+    coinSpawnTimer += dt;
+    if (coinSpawnTimer >= 2.2) { spawnCoins(); coinSpawnTimer = 0; }
+
+    // Move, spin, collect, and pop-animate coins
+    for (let i = coinActive.length - 1; i >= 0; i--) {
+      const c = coinActive[i];
+      c.position.z -= speed * dt;
+
+      // Spin
+      c._rotY += dt * 3.2;
+      c.rotation.y = c._rotY;
+
+      // Cull
+      if (c.position.z < DESPAWN_Z) { despawnCoin(c); continue; }
+
+      // Pop animation (after collect)
+      if (c._popT > 0) {
+        c._popT -= dt;
+        const sc = 1 + (1 - c._popT / 0.12) * 1.4;
+        c.scaling.setAll(sc);
+        if (c._popT <= 0) { despawnCoin(c); burstCoin(c.position.x, c.position.z); }
+        continue;
+      }
+
+      // Collection check
+      const dx = Math.abs(pPos.x - c.position.x);
+      const dz = Math.abs(c.position.z);
+      if (dx < COIN_RADIUS && dz < COIN_RADIUS) {
+        coinCount++;
+        updateCoinHud();
+        collectCoin(c);
+      }
     }
 
     // Lane switch tween (ease-in-out cubic, 130ms)
