@@ -3,6 +3,7 @@
 // ================================================================
 import { LANE_X, GROUND_Y, LANE_DUR, SQUASH_DUR,
          JUMP_V, GRAV_RISE, GRAV_FALL } from './config.js';
+import { playJump, playSlam } from './audio.js';
 
 const LEAN_LANE_ANG = 15 * Math.PI / 180;
 const LEAN_JUMP_UP  =  8 * Math.PI / 180;
@@ -186,7 +187,7 @@ export function doRight() {
   laneTween.p     = 0;
 }
 export function doJump() {
-  if (!ps.jumping) { ps.velY = JUMP_V; ps.jumping = true; }
+  if (!ps.jumping) { ps.velY = JUMP_V; ps.jumping = true; playJump(); }
 }
 export function doSlam(burstDust) {
   if (!ps.jumping) return;
@@ -195,4 +196,5 @@ export function doSlam(burstDust) {
   ps.jumping = false;
   ps.squashT = SQUASH_DUR; // full squash on slam
   burstDust(pPos.x);
+  playSlam();
 }

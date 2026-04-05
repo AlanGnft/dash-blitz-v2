@@ -8,6 +8,7 @@
 import { LANE_X, GROUND_Y, SPAWN_Z, DESPAWN_Z } from './config.js';
 import { obsActive } from './obstacles.js';
 import { updateCoinHud } from './hud.js';
+import { playCoin } from './audio.js';
 
 const COIN_POOL_SZ = 20;
 const COIN_RADIUS  = 0.8;   // collect radius — generous / magnetic
@@ -232,6 +233,7 @@ export function updateCoins(dt, speed, pPos) {
       _streak++;
       _streakTimer = 0.55;
       updateCoinHud(coinCount);
+      playCoin();
       c._popT = 0.12;
     }
   }
