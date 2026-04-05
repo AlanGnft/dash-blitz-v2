@@ -23,6 +23,7 @@ export function initAudio() {
 // ---- One-shot helpers ------------------------------------------
 
 function oneShot(fn) {
+  if (window._dashSfxMuted) return;
   try { fn(ctx()); } catch (e) { /* audio not critical */ }
 }
 

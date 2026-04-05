@@ -9,19 +9,21 @@ import * as hud from './hud.js';
 import { initEffects, burstDust, triggerCamShake, updateEffects } from './effects.js';
 import { initPlayer, resetPlayer, updatePlayer, pPos, ps,
          doLeft, doRight, doJump, doSlam,
-         killPlayerPop, hidePlayer, showPlayer } from './player.js';
-import { initObstacles, spawnObs, despawnObs, clearObs,
-         obsActive, checkCollisions,
-         spawnDouble, spawnBarrier } from './obstacles.js';
+         killPlayerPop, hidePlayer, showPlayer,
+         setCharacter, getCharacter } from './player.js';
+import { initObstacles, spawnObs, spawnDouble, spawnBarrier,
+         despawnObs, clearObs, obsActive, checkCollisions } from './obstacles.js';
 import { initCoins, resetCoins, updateCoins, coinCount, burstCoinsAt } from './coins.js';
 import { initMuncher, resetChaser, updateMuncher, chaser,
-         startMuncherSurge, updateMuncherSurge, snapMuncherJawShut, muncherIdleAnim } from './muncher.js';
+         startMuncherSurge, updateMuncherSurge, snapMuncherJawShut,
+         muncherIdleAnim } from './muncher.js';
 import { initAudio, startMusic, stopMusic, playGraze, playDeath,
          playMuncherRoar, playMilestone } from './audio.js';
 import { saveHighScore, getHighScore, addRunStats,
          getSavedCharacter, getUnlockedCharacters } from './highscore.js';
 import { CHARACTERS } from './characters/index.js';
-import { setCharacter } from './player.js';
+import { initScreens, showScreen, hideAllScreens, getCurrentScreen } from './ui/screens.js';
+import { initMenu, showPauseScreen } from './ui/menu.js';
 
 // ---- Engine & Scene ------------------------------------------------
 const canvas = document.getElementById('renderCanvas');
@@ -127,6 +129,9 @@ function resetTrack() {
 // ---- Module init ---------------------------------------------------
 initEffects(scene);
 initPlayer(scene);
+initObstacles(scene);
+initCoins(scene);
+initMuncher(scene);
 
 // Restore saved character
 (function() {
@@ -138,16 +143,21 @@ initPlayer(scene);
   }
 })();
 
-initObstacles(scene);
-initCoins(scene);
-initMuncher(scene);
+// ---- Screen / Menu init -------------------------------------------
+initScreens();
+initMenu({
+  onStartGame:  startGame,    // hoisted — defined below
+  onCharChange: _previewChar,
+  stopMusic,
+  startMusic,
+});
 
-// Populate start screen high score
+// Update title best score
 const _initHs = getHighScore();
-hud.updateStartBest(_initHs.distance, _initHs.coins);
+hud.updateTitleBest(_initHs.distance, _initHs.coins);
 
 // ---- Game state ----------------------------------------------------
-let gs         = 'START';
+let gs         = 'MENU';
 let score      = 0;
 let grazeInvincibleTimer = 0;
 let speed      = BASE_SPD;
@@ -160,7 +170,7 @@ const CAM_TITLE = { y: 9,  z: -17 };
 const CAM_PLAY  = { y: 7,  z: -11 };
 
 // ---- Death sequence state ------------------------------------
-let _deathT    = 0;
+let _deathT       = 0;
 let _deathGoShown = false;
 let _applePopped  = false;
 let _roarPlayed   = false;
@@ -176,36 +186,47 @@ let _milestoneHit  = [false, false, false, false];
 let _progressPhase = 0;
 let _spawnMult     = 1.0;
 
+// ---- Character preview (carousel) ----------------------------
+function _previewChar(charEntry) {
+  // During MENU state, swap the active character in the 3D scene
+  if (gs === 'MENU') {
+    const instance = new charEntry.Class(scene);
+    setCharacter(instance);
+  }
+}
+
+// ---- startGame (called from menu) ---------------------------------
 function startGame() {
   if (gs === 'DYING') return;
   initAudio();
-  _milestoneHit  = [false, false, false, false];
-  _progressPhase = 0;
-  _spawnMult     = 1.0;
+
   score      = 0;
   speed      = BASE_SPD;
   spawnTimer = 0;
   spawnIv    = SPAWN_T0;
-  grazeInvincibleTimer = 0;
+  grazeInvincibleTimer  = 0;
+  _milestoneHit  = [false, false, false, false];
+  _progressPhase = 0;
+  _spawnMult     = 1.0;
 
   resetPlayer();
   clearObs();
-  resetCoins();   // resets count, streak, clears pool, updates HUD
+  resetCoins();
   resetTrack();
   resetChaser();
   hud.setDanger(0);
-  hud.hideStartScreen();
-  hud.hideGameOver();
-  hud.showHUD();
-  hud.showCoinHud();
-  hud.updateScore(0);
   hud.setFadeBlack(0);
   showPlayer();
+  hud.showHUD();
+  hud.showCoinHud();
+  hud.showPauseBtn();
+  hud.updateScore(0);
 
   _startingT = 0;
   gs = 'STARTING';
 }
 
+// ---- Death sequence -----------------------------------------------
 function triggerDeathSequence() {
   if (gs !== 'PLAY') return;
   gs = 'DYING';
@@ -217,6 +238,7 @@ function triggerDeathSequence() {
   playDeath();
   hud.hideHUD();
   hud.hideCoinHud();
+  hud.hidePauseBtn();
   hud.setDanger(0);
   hud.triggerDeathFlash();
   startMuncherSurge();
@@ -230,26 +252,66 @@ function _finalizeGameOver() {
   hud.setGoStats(score, coinCount, hs.distance, hs.coins, newDistanceRecord, newCoinRecord);
   hud.showGameOver();
   hidePlayer();
+  // Update title best for next time
+  hud.updateTitleBest(hs.distance, hs.coins);
 }
+
+// ---- Pause --------------------------------------------------------
+function pauseGame() {
+  if (gs !== 'PLAY') return;
+  gs = 'PAUSED';
+  stopMusic();
+  showPauseScreen();
+}
+
+function resumeGame() {
+  if (gs !== 'PAUSED') return;
+  gs = 'PLAY';
+  startMusic();
+}
+
+function goToMainMenu() {
+  stopMusic();
+  hud.hideHUD();
+  hud.hideCoinHud();
+  hud.hidePauseBtn();
+  hud.setDanger(0);
+  hud.setFadeBlack(0);
+  hud.hideGameOver();
+  clearObs();
+  resetCoins();
+  resetTrack();
+  resetChaser();
+  resetPlayer();
+  showPlayer();
+  gs = 'MENU';
+  showScreen('main-menu');
+}
+
+// ---- Custom events from menu.js -----------------------------------
+window.addEventListener('dashblitz:resume',   () => resumeGame());
+window.addEventListener('dashblitz:restart',  () => { hideAllScreens(); startGame(); });
+window.addEventListener('dashblitz:mainmenu', () => goToMainMenu());
 
 // ---- Input ---------------------------------------------------------
 let tx0 = 0, ty0 = 0;
 
 window.addEventListener('keydown', e => {
-  if (gs === 'START') { startGame(); return; }
+  if (e.key === 'Escape') {
+    if (gs === 'PLAY')   { pauseGame();  return; }
+    if (gs === 'PAUSED') { resumeGame(); hideAllScreens(); return; }
+  }
   if (gs !== 'PLAY') return;
   switch (e.key) {
     case 'ArrowLeft':  case 'a': case 'A': doLeft();  break;
     case 'ArrowRight': case 'd': case 'D': doRight(); break;
     case 'ArrowUp':    case 'w': case 'W': case ' ':  doJump(); break;
-    case 'ArrowDown':  case 's': case 'S':
-      doSlam(burstDust); break;
+    case 'ArrowDown':  case 's': case 'S': doSlam(burstDust); break;
   }
 });
 
 canvas.addEventListener('touchstart', e => {
   tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY;
-  if (gs === 'START') startGame();
 }, { passive: true });
 
 canvas.addEventListener('touchend', e => {
@@ -264,13 +326,13 @@ canvas.addEventListener('touchend', e => {
   }
 }, { passive: true });
 
-hud.onStartClick(startGame);
-hud.onPlayAgainClick(startGame);
+hud.onPauseBtnClick(pauseGame);
 
 // ---- Game loop -----------------------------------------------------
 engine.runRenderLoop(() => {
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
 
+  // ---- PLAY state ------------------------------------------------
   if (gs === 'PLAY') {
     // Speed ramp
     speed = Math.min(speed + ACCEL * dt, MAX_SPD);
@@ -368,6 +430,7 @@ engine.runRenderLoop(() => {
     if (chaser.dist <= 0) triggerDeathSequence();
   }
 
+  // ---- DYING state -----------------------------------------------
   if (gs === 'DYING') {
     _deathT += dt;
 
@@ -424,6 +487,7 @@ engine.runRenderLoop(() => {
     }
   }
 
+  // ---- STARTING state (camera transition) ------------------------
   if (gs === 'STARTING') {
     _startingT += dt;
     const p  = Math.min(1, _startingT / 0.4);
@@ -439,13 +503,17 @@ engine.runRenderLoop(() => {
     }
   }
 
-  if (gs === 'START') {
+  // ---- MENU state (title + all menu screens) ---------------------
+  if (gs === 'MENU') {
     camera.position.y = CAM_TITLE.y;
     camera.position.z = CAM_TITLE.z;
     camera.setTarget(new BABYLON.Vector3(0, 0.8, 20));
     updatePlayer(dt, () => {}, () => {});
     muncherIdleAnim(dt);
   }
+
+  // ---- PAUSED state ----------------------------------------------
+  // Nothing advances — scene still renders but game frozen.
 
   scene.render();
 });
