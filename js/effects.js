@@ -1,17 +1,14 @@
 // ================================================================
-//  DASH BLITZ — Effects: dust particles, speed lines, camera shake
+//  DASH BLITZ — Effects: dust particles, camera shake
+//  Speed lines are CSS-only (see #speed-lines in game.css / index.html)
 // ================================================================
-import { GROUND_Y, BASE_SPD, MAX_SPD } from './config.js';
+import { GROUND_Y } from './config.js';
 
-const SPEEDLINE_COUNT  = 12;
-const SPEEDLINE_THRESH = 0.60;
-const CAM_SHAKE_DUR    = 0.15;
-const CAM_SHAKE_AMP    = 0.08;
+const CAM_SHAKE_DUR = 0.15;
+const CAM_SHAKE_AMP = 0.08;
 
 let _dustPS;
-let _matSpeedLine;
-let _speedLines = [];
-let _camShakeT  = 0;
+let _camShakeT = 0;
 
 export function initEffects(scene) {
   // ---- Dust particle texture (soft warm gradient)
@@ -41,24 +38,6 @@ export function initEffects(scene) {
   _dustPS.color2          = new BABYLON.Color4(0.78, 0.68, 0.52, 0.7);
   _dustPS.colorDead       = new BABYLON.Color4(0.60, 0.52, 0.38, 0);
   _dustPS.blendMode       = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
-
-  // ---- Speed lines: billboard planes radiating from screen center
-  _matSpeedLine = new BABYLON.StandardMaterial('speedLine', scene);
-  _matSpeedLine.diffuseColor    = new BABYLON.Color3(1, 1, 1);
-  _matSpeedLine.emissiveColor   = new BABYLON.Color3(0.85, 0.85, 0.88);
-  _matSpeedLine.backFaceCulling = false;
-  _matSpeedLine.alpha           = 0;
-
-  for (let i = 0; i < SPEEDLINE_COUNT; i++) {
-    const sl = BABYLON.MeshBuilder.CreatePlane('sl_' + i,
-      { width: 0.045, height: 0.9 + Math.random() * 0.8 }, scene);
-    sl.material      = _matSpeedLine;
-    sl.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-    sl.isPickable    = false;
-    sl._angle = (i / SPEEDLINE_COUNT) * Math.PI * 2;
-    sl._dist  = 1.8 + Math.random() * 1.4;
-    _speedLines.push(sl);
-  }
 }
 
 export function burstDust(x) {
@@ -70,30 +49,11 @@ export function burstDust(x) {
 export function triggerCamShake() { _camShakeT = CAM_SHAKE_DUR; }
 
 // Called each frame during PLAY. Mutates camera.position.y for shake.
-export function updateEffects(dt, speed, camera) {
-  // Camera micro-shake (Y bounce, 150ms)
+export function updateEffects(dt, camera) {
   let shakeY = 0;
   if (_camShakeT > 0) {
     _camShakeT -= dt;
     shakeY = Math.sin((_camShakeT / CAM_SHAKE_DUR) * Math.PI) * CAM_SHAKE_AMP;
   }
   camera.position.y = 7 + shakeY;
-
-  // Speed lines — fade in above 60% max speed
-  const speedT = (speed - BASE_SPD) / (MAX_SPD - BASE_SPD);
-  const t      = Math.max(0, (speedT - SPEEDLINE_THRESH) / (1 - SPEEDLINE_THRESH));
-  _matSpeedLine.alpha = t * 0.38;
-
-  if (t > 0.01) {
-    const anchorX = camera.position.x * 0.3;
-    for (const sl of _speedLines) {
-      sl._angle += dt * (0.18 + t * 0.55);
-      sl.position.set(
-        anchorX + Math.cos(sl._angle) * sl._dist,
-        2.2     + Math.sin(sl._angle) * sl._dist * 0.55,
-        4.0
-      );
-      sl.scaling.y = 0.6 + t * 1.2;
-    }
-  }
 }
