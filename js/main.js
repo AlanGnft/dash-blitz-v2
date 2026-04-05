@@ -34,10 +34,10 @@ const engine = new BABYLON.Engine(canvas, true, {
   powerPreference: 'high-performance'
 });
 const scene = new BABYLON.Scene(engine);
-scene.clearColor = new BABYLON.Color4(0.051, 0.051, 0.055, 1);
+scene.clearColor = new BABYLON.Color4(0.08, 0.06, 0.04, 1);   // warm dark — matches world fog
 scene.fogMode    = BABYLON.Scene.FOGMODE_EXP2;
-scene.fogColor   = new BABYLON.Color3(0.05, 0.05, 0.055);
-scene.fogDensity = 0.022;
+scene.fogColor   = new BABYLON.Color3(0.08, 0.06, 0.04);
+scene.fogDensity = 0.01;
 
 // ---- Camera --------------------------------------------------------
 const camera = new BABYLON.FreeCamera('cam',
@@ -50,13 +50,13 @@ camera.maxZ = 220;
 // ---- Lighting ------------------------------------------------------
 const hemi = new BABYLON.HemisphericLight('hemi',
   new BABYLON.Vector3(0, 1, 0), scene);
-hemi.intensity   = 0.28;
-hemi.diffuse     = new BABYLON.Color3(0.7, 0.7, 0.85);
-hemi.groundColor = new BABYLON.Color3(0.04, 0.04, 0.06);
+hemi.intensity   = 0.45;
+hemi.diffuse     = new BABYLON.Color3(1.0, 0.92, 0.78);  // warm white
+hemi.groundColor = new BABYLON.Color3(0.08, 0.06, 0.03);
 
 const sun = new BABYLON.DirectionalLight('sun',
   new BABYLON.Vector3(-0.25, -1, 0.6), scene);
-sun.intensity = 1.3;
+sun.intensity = 1.3;   // unchanged
 sun.diffuse   = new BABYLON.Color3(1, 0.94, 0.88);
 
 const rimLight = new BABYLON.PointLight('rim',
