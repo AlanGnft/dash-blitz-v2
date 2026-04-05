@@ -19,7 +19,7 @@ import { initMuncher, resetChaser, updateMuncher, chaser,
          muncherIdleAnim } from './muncher.js';
 import { initAudio, startMusic, stopMusic, playGraze, playDeath,
          playMuncherRoar, playMilestone } from './audio.js';
-import { saveHighScore, getHighScore, addRunStats,
+import { saveHighScore, getHighScore, addRunStats, getTotalStats,
          getSavedCharacter, getUnlockedCharacters } from './highscore.js';
 import { CHARACTERS } from './characters/index.js';
 import { initScreens, showScreen, hideAllScreens, getCurrentScreen } from './ui/screens.js';
@@ -140,6 +140,20 @@ initMuncher(scene);
   if (savedId !== 'apple' && unlocked.includes(savedId)) {
     const entry = CHARACTERS.find(c => c.id === savedId);
     if (entry) setCharacter(new entry.Class(scene));
+  }
+})();
+
+// Seed starter coins
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const KEY = 'dashblitz_total';
+  let s = getTotalStats();
+  if (params.get('dev') === '1') {
+    s.totalCoins = 9999;
+    localStorage.setItem(KEY, JSON.stringify(s));
+  } else if (s.gamesPlayed === 0 && s.totalCoins === 0) {
+    s.totalCoins = 300;
+    localStorage.setItem(KEY, JSON.stringify(s));
   }
 })();
 
@@ -481,8 +495,14 @@ engine.runRenderLoop(() => {
       _finalizeGameOver();
     }
 
-    // t=1200ms: game fully interactive
-    if (_deathT >= 1.2 && _deathGoShown) {
+    // t=1000-1500ms: fade black back out to reveal game over screen
+    if (_deathGoShown && _deathT >= 1.0 && _deathT < 1.5) {
+      hud.setFadeBlack(1 - (_deathT - 1.0) / 0.5);
+    }
+
+    // t=1500ms: game fully interactive
+    if (_deathT >= 1.5 && _deathGoShown) {
+      hud.setFadeBlack(0);
       gs = 'DEAD';
     }
   }
