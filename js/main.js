@@ -3,17 +3,21 @@
 // ================================================================
 import { LANE_X, TRACK_W, TILE_D, TILE_N, WRAP_Q,
          SPAWN_Z, DESPAWN_Z, BASE_SPD, MAX_SPD, ACCEL,
-         SPAWN_T0, SPAWN_TMIN, CHASER_SURGE1 } from './config.js';
+         SPAWN_T0, SPAWN_TMIN, CHASER_SURGE1, GROUND_Y } from './config.js';
 
 import * as hud from './hud.js';
 import { initEffects, burstDust, triggerCamShake, updateEffects } from './effects.js';
 import { initPlayer, resetPlayer, updatePlayer, pPos, ps,
-         doLeft, doRight, doJump, doSlam } from './player.js';
+         doLeft, doRight, doJump, doSlam,
+         killPlayerPop, hidePlayer, showPlayer } from './player.js';
 import { initObstacles, spawnObs, despawnObs, clearObs,
-         obsActive, checkCollisions } from './obstacles.js';
-import { initCoins, resetCoins, updateCoins, coinCount } from './coins.js';
-import { initMuncher, resetChaser, updateMuncher, chaser } from './muncher.js';
-import { initAudio, startMusic, stopMusic, playGraze, playDeath } from './audio.js';
+         obsActive, checkCollisions,
+         spawnDouble, spawnBarrier } from './obstacles.js';
+import { initCoins, resetCoins, updateCoins, coinCount, burstCoinsAt } from './coins.js';
+import { initMuncher, resetChaser, updateMuncher, chaser,
+         startMuncherSurge, updateMuncherSurge, snapMuncherJawShut, muncherIdleAnim } from './muncher.js';
+import { initAudio, startMusic, stopMusic, playGraze, playDeath,
+         playMuncherRoar, playMilestone } from './audio.js';
 import { saveHighScore, getHighScore } from './highscore.js';
 
 // ---- Engine & Scene ------------------------------------------------
@@ -31,7 +35,7 @@ scene.fogDensity = 0.022;
 
 // ---- Camera --------------------------------------------------------
 const camera = new BABYLON.FreeCamera('cam',
-  new BABYLON.Vector3(0, 7, -11), scene);
+  new BABYLON.Vector3(0, 9, -17), scene);
 camera.setTarget(new BABYLON.Vector3(0, 0.8, 20));
 camera.fov  = 0.9;
 camera.minZ = 0.1;
@@ -124,6 +128,10 @@ initObstacles(scene);
 initCoins(scene);
 initMuncher(scene);
 
+// Populate start screen high score
+const _initHs = getHighScore();
+hud.updateStartBest(_initHs.distance, _initHs.coins);
+
 // ---- Game state ----------------------------------------------------
 let gs         = 'START';
 let score      = 0;
@@ -132,8 +140,34 @@ let speed      = BASE_SPD;
 let spawnTimer = 0;
 let spawnIv    = SPAWN_T0;
 
+// ---- Title / start transition --------------------------------
+let _startingT = 0;
+const CAM_TITLE = { y: 9,  z: -17 };
+const CAM_PLAY  = { y: 7,  z: -11 };
+
+// ---- Death sequence state ------------------------------------
+let _deathT    = 0;
+let _deathGoShown = false;
+let _applePopped  = false;
+let _roarPlayed   = false;
+
+// ---- Progression milestones ----------------------------------
+const MILESTONES = [
+  { score: 100,  text: 'PICKING UP SPEED',       spawnMult: 0.80 },
+  { score: 250,  text: "IT'S GETTING DANGEROUS", spawnMult: 0.72 },
+  { score: 500,  text: 'FULL SPEED',             spawnMult: 0.65 },
+  { score: 1000, text: 'UNSTOPPABLE',            spawnMult: 0.55 },
+];
+let _milestoneHit  = [false, false, false, false];
+let _progressPhase = 0;
+let _spawnMult     = 1.0;
+
 function startGame() {
+  if (gs === 'DYING') return;
   initAudio();
+  _milestoneHit  = [false, false, false, false];
+  _progressPhase = 0;
+  _spawnMult     = 1.0;
   score      = 0;
   speed      = BASE_SPD;
   spawnTimer = 0;
@@ -151,23 +185,36 @@ function startGame() {
   hud.showHUD();
   hud.showCoinHud();
   hud.updateScore(0);
+  hud.setFadeBlack(0);
+  showPlayer();
 
-  gs = 'PLAY';
-  startMusic();
+  _startingT = 0;
+  gs = 'STARTING';
 }
 
-function triggerGameOver() {
-  gs = 'DEAD';
+function triggerDeathSequence() {
+  if (gs !== 'PLAY') return;
+  gs = 'DYING';
+  _deathT       = 0;
+  _deathGoShown = false;
+  _applePopped  = false;
+  _roarPlayed   = false;
   stopMusic();
   playDeath();
   hud.hideHUD();
   hud.hideCoinHud();
   hud.setDanger(0);
+  hud.triggerDeathFlash();
+  startMuncherSurge();
+}
+
+function _finalizeGameOver() {
   hud.setFinalScore(score);
   const { newDistanceRecord, newCoinRecord } = saveHighScore(score, coinCount);
   const hs = getHighScore();
   hud.setGoStats(score, coinCount, hs.distance, hs.coins, newDistanceRecord, newCoinRecord);
   hud.showGameOver();
+  hidePlayer();
 }
 
 // ---- Input ---------------------------------------------------------
@@ -215,11 +262,49 @@ engine.runRenderLoop(() => {
     score += speed * dt * 0.5;
     hud.updateScore(score);
 
-    // Obstacle spawn interval tightens with speed
+    // Milestone checks
+    for (let _mi = 0; _mi < MILESTONES.length; _mi++) {
+      if (!_milestoneHit[_mi] && score >= MILESTONES[_mi].score) {
+        _milestoneHit[_mi] = true;
+        _progressPhase = _mi + 1;
+        _spawnMult = MILESTONES[_mi].spawnMult;
+        hud.showMilestoneText(MILESTONES[_mi].text);
+        playMilestone();
+        if (_mi === 1) {
+          // 250m: muncher closer
+          chaser.dist = Math.max(chaser.dist - 4, 8);
+        }
+        if (_mi === 2) {
+          // 500m: instant max speed + shake
+          speed = MAX_SPD;
+          triggerCamShake();
+        }
+        if (_mi === 3) {
+          // 1000m: gold burst
+          hud.triggerGoldBurst();
+          burstCoinsAt(LANE_X[0], GROUND_Y + 0.5, 5);
+          burstCoinsAt(LANE_X[1], GROUND_Y + 0.5, 5);
+          burstCoinsAt(LANE_X[2], GROUND_Y + 0.5, 5);
+        }
+      }
+    }
+
+    // Obstacle spawn interval tightens with speed and milestone
     const speedT = (speed - BASE_SPD) / (MAX_SPD - BASE_SPD);
-    spawnIv = SPAWN_T0 - speedT * (SPAWN_T0 - SPAWN_TMIN);
+    spawnIv = (SPAWN_T0 - speedT * (SPAWN_T0 - SPAWN_TMIN)) * _spawnMult;
     spawnTimer += dt;
-    if (spawnTimer >= spawnIv) { spawnObs(); spawnTimer = 0; }
+    if (spawnTimer >= spawnIv) {
+      if (_progressPhase >= 4 && Math.random() < 0.45) {
+        spawnDouble();
+      } else if (_progressPhase >= 3 && Math.random() < 0.25) {
+        spawnBarrier();
+      } else if (_progressPhase >= 2 && Math.random() < 0.35) {
+        spawnDouble();
+      } else {
+        spawnObs();
+      }
+      spawnTimer = 0;
+    }
 
     // Track scroll
     scrollTrack(dt, speed);
@@ -252,10 +337,10 @@ engine.runRenderLoop(() => {
     if (grazeInvincibleTimer > 0) grazeInvincibleTimer -= dt;
     const hit = checkCollisions(pPos);
     if (hit === 'HIT' && grazeInvincibleTimer <= 0) {
-      triggerGameOver();
+      triggerDeathSequence();
     } else if (hit === 'GRAZE') {
       if (chaser.grazes >= 1) {
-        triggerGameOver();
+        triggerDeathSequence();
       } else {
         chaser.grazes++;
         chaser.dist = Math.max(2, chaser.dist - CHASER_SURGE1);
@@ -265,7 +350,86 @@ engine.runRenderLoop(() => {
       }
     }
 
-    if (chaser.dist <= 0) triggerGameOver();
+    if (chaser.dist <= 0) triggerDeathSequence();
+  }
+
+  if (gs === 'DYING') {
+    _deathT += dt;
+
+    // t=0-100ms: slow-mo idle — muncher jaw moves lazily
+    if (_deathT < 0.1) {
+      muncherIdleAnim(dt * 0.15);
+    }
+
+    // t=100-400ms: muncher surges forward hard
+    if (_deathT >= 0.1 && _deathT < 0.4) {
+      updateMuncherSurge((_deathT - 0.1) / 0.3);
+    }
+
+    // t=400-450ms: apple pops (scale 1 → 0)
+    if (_deathT >= 0.4 && _deathT < 0.45) {
+      killPlayerPop((_deathT - 0.4) / 0.05);
+    }
+
+    // t=450ms: particle burst, freeze apple at scale 0
+    if (_deathT >= 0.45 && !_applePopped) {
+      _applePopped = true;
+      killPlayerPop(1);
+      burstCoinsAt(pPos.x, pPos.y + 0.5, 0);
+    }
+
+    // t=400-500ms: hard camera shake (3 oscillations)
+    if (_deathT >= 0.4 && _deathT < 0.5) {
+      camera.position.y = 7 + Math.sin((_deathT - 0.4) / 0.1 * Math.PI * 6) * 0.25;
+    } else if (_deathT >= 0.5) {
+      camera.position.y = 7;
+    }
+
+    // t=500ms: jaw snaps shut + roar
+    if (_deathT >= 0.5 && !_roarPlayed) {
+      _roarPlayed = true;
+      snapMuncherJawShut();
+      playMuncherRoar();
+    }
+
+    // t=700-1000ms: fade to black
+    if (_deathT >= 0.7) {
+      hud.setFadeBlack(Math.min(1, (_deathT - 0.7) / 0.3));
+    }
+
+    // t=1000ms: show game over screen
+    if (_deathT >= 1.0 && !_deathGoShown) {
+      _deathGoShown = true;
+      _finalizeGameOver();
+    }
+
+    // t=1200ms: game fully interactive
+    if (_deathT >= 1.2 && _deathGoShown) {
+      gs = 'DEAD';
+    }
+  }
+
+  if (gs === 'STARTING') {
+    _startingT += dt;
+    const p  = Math.min(1, _startingT / 0.4);
+    const ep = p < 0.5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
+    camera.position.y = CAM_TITLE.y + (CAM_PLAY.y - CAM_TITLE.y) * ep;
+    camera.position.z = CAM_TITLE.z + (CAM_PLAY.z - CAM_TITLE.z) * ep;
+    camera.setTarget(new BABYLON.Vector3(camera.position.x * 0.25, 0.8, 20));
+    updatePlayer(dt, () => {}, () => {});
+    muncherIdleAnim(dt);
+    if (p >= 1) {
+      gs = 'PLAY';
+      startMusic();
+    }
+  }
+
+  if (gs === 'START') {
+    camera.position.y = CAM_TITLE.y;
+    camera.position.z = CAM_TITLE.z;
+    camera.setTarget(new BABYLON.Vector3(0, 0.8, 20));
+    updatePlayer(dt, () => {}, () => {});
+    muncherIdleAnim(dt);
   }
 
   scene.render();

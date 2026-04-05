@@ -44,6 +44,14 @@ export function initObstacles(scene) {
       _pool.push(root);
     }
   }
+
+  for (let i = 0; i < 3; i++) {
+    const root = _makeBarrier(i, scene);
+    root._active = false; root._grazed = false;
+    root.position.set(0, 0, SPAWN_Z + 200);
+    for (const m of root._meshes) m.isVisible = false;
+    _pool.push(root);
+  }
 }
 
 function _makeCan(idx, scene) {
@@ -67,6 +75,19 @@ function _makeCrate(idx, scene) {
     { width: 0.80, height: 0.80, depth: 0.80 }, scene);
   top.material = _matCrate; top.position.set(0.06, 1.20, -0.05); top.parent = root;
   root._meshes = [bot, top]; root._halfW = 0.52; root._type = 'crate';
+  return root;
+}
+
+function _makeBarrier(idx, scene) {
+  const root = new BABYLON.TransformNode('obs_barrier_' + idx, scene);
+  const bar  = BABYLON.MeshBuilder.CreateBox('barrierBox_' + idx,
+    { width: 3.3, height: 0.55, depth: 0.75 }, scene);
+  bar.material = _matCrate;
+  bar.position.y = 0.275;
+  bar.parent = root;
+  root._meshes = [bar];
+  root._halfW  = 1.65;
+  root._type   = 'barrier';
   return root;
 }
 
@@ -113,6 +134,33 @@ export function despawnObs(m) {
 
 export function clearObs() {
   while (obsActive.length) despawnObs(obsActive[0]);
+}
+
+export function spawnDouble() {
+  const avail = _pool.filter(o => !o._active && o._type !== 'barrier');
+  if (avail.length < 2) { spawnObs(); return; }
+  const l1 = Math.floor(Math.random() * 3);
+  const l2 = (l1 + 1 + Math.floor(Math.random() * 2)) % 3;
+  [avail[0], avail[1]].forEach((m, k) => {
+    const lane = k === 0 ? l1 : l2;
+    m.position.set(LANE_X[lane], 0, SPAWN_Z);
+    if (m._type !== 'cart') m.rotation.y = (Math.random() - 0.5) * 0.8;
+    for (const mesh of m._meshes) mesh.isVisible = true;
+    m._active = true; m._grazed = false;
+    obsActive.push(m);
+  });
+}
+
+export function spawnBarrier() {
+  const avail = _pool.filter(o => !o._active && o._type === 'barrier');
+  if (!avail.length) return;
+  const m = avail[0];
+  // Place at ±1.1 — blocks two lanes, leaves one lane and jump as escape
+  m.position.set(Math.random() < 0.5 ? -1.1 : 1.1, 0, SPAWN_Z);
+  m.rotation.y = 0;
+  for (const mesh of m._meshes) mesh.isVisible = true;
+  m._active = true; m._grazed = false;
+  obsActive.push(m);
 }
 
 export function checkCollisions(pPos) {

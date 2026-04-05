@@ -33,6 +33,7 @@
     <span>← →</span> Switch lanes &nbsp;&nbsp; <span>↑ / Space</span> Jump &nbsp;&nbsp; <span>↓ / S</span> Slam<br>
     Swipe left / right / up / down on mobile
   </div>
+  <div id="startBest">BEST: <span id="startBestDist">0</span>m &bull; <span id="startBestCoins">0</span> coins</div>
 </div>
 
 <!-- Game Over Screen -->
@@ -49,11 +50,19 @@
   <button class="play-btn" id="playAgainBtn">Play Again</button>
 </div>
 
+<!-- Milestone flash text -->
+<div id="milestoneText"></div>
+<!-- Gold burst effect for 1000m milestone -->
+<div id="goldBurst"></div>
 <!-- Chaser danger vignette -->
 <div id="dangerOverlay"></div>
 
 <!-- Graze warning flash -->
 <div id="grazeFlash"></div>
+<!-- Death flash (white) -->
+<div id="deathFlash"></div>
+<!-- Fade to black (death outro) -->
+<div id="fadeBlack"></div>
 
 <!-- Babylon.js 7.x -->
 <script src="https://cdn.babylonjs.com/babylon.js"></script>

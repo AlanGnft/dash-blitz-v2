@@ -96,6 +96,7 @@ export function resetPlayer() {
   lean.z = 0; lean.x = 0;
   _body.rotation.set(0, 0, 0);
   _place();
+  showPlayer();
 }
 
 // burstDust and triggerCamShake are passed as callbacks to avoid
@@ -197,4 +198,25 @@ export function doSlam(burstDust) {
   ps.squashT = SQUASH_DUR; // full squash on slam
   burstDust(pPos.x);
   playSlam();
+}
+
+export function killPlayerPop(progress) {
+  const s = Math.max(0, 1 - progress);
+  _body.scaling.setAll(s);
+  _leaf.scaling.set(0.72 * s, 0.32 * s, 0.9 * s);
+  _stem.scaling.setAll(s);
+  _eyeL.scaling.setAll(s);
+  _eyeR.scaling.setAll(s);
+  _pupilL.scaling.setAll(s);
+  _pupilR.scaling.setAll(s);
+}
+
+export function hidePlayer() {
+  for (const m of [_body, _leaf, _stem, _eyeL, _eyeR, _pupilL, _pupilR])
+    m.isVisible = false;
+}
+
+export function showPlayer() {
+  for (const m of [_body, _leaf, _stem, _eyeL, _eyeR, _pupilL, _pupilR])
+    m.isVisible = true;
 }
