@@ -3,6 +3,7 @@
 // ================================================================
 import { CHASER_MAX, CHASER_START, CHASER_RETREAT } from './config.js';
 import { setDanger } from './hud.js';
+import { startMuncherGrowl } from './audio.js';
 
 export const chaser = { dist: CHASER_START, grazes: 0 };
 
@@ -124,6 +125,9 @@ export function updateMuncher(dt, pPosX, cameraX) {
 
   // Danger vignette overlay
   setDanger(Math.pow(1 - chaser.dist / CHASER_MAX, 1.5) * 0.9);
+
+  // Growl scales with danger
+  startMuncherGrowl(dangerT);
 
   return dangerT;
 }

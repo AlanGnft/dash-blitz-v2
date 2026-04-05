@@ -11,8 +11,10 @@ import { initPlayer, resetPlayer, updatePlayer, pPos, ps,
          doLeft, doRight, doJump, doSlam } from './player.js';
 import { initObstacles, spawnObs, despawnObs, clearObs,
          obsActive, checkCollisions } from './obstacles.js';
-import { initCoins, resetCoins, updateCoins } from './coins.js';
+import { initCoins, resetCoins, updateCoins, coinCount } from './coins.js';
 import { initMuncher, resetChaser, updateMuncher, chaser } from './muncher.js';
+import { initAudio, startMusic, stopMusic, playGraze, playDeath } from './audio.js';
+import { saveHighScore, getHighScore } from './highscore.js';
 
 // ---- Engine & Scene ------------------------------------------------
 const canvas = document.getElementById('renderCanvas');
@@ -131,6 +133,7 @@ let spawnTimer = 0;
 let spawnIv    = SPAWN_T0;
 
 function startGame() {
+  initAudio();
   score      = 0;
   speed      = BASE_SPD;
   spawnTimer = 0;
@@ -150,14 +153,20 @@ function startGame() {
   hud.updateScore(0);
 
   gs = 'PLAY';
+  startMusic();
 }
 
 function triggerGameOver() {
   gs = 'DEAD';
+  stopMusic();
+  playDeath();
   hud.hideHUD();
   hud.hideCoinHud();
   hud.setDanger(0);
   hud.setFinalScore(score);
+  const { newDistanceRecord, newCoinRecord } = saveHighScore(score, coinCount);
+  const hs = getHighScore();
+  hud.setGoStats(score, coinCount, hs.distance, hs.coins, newDistanceRecord, newCoinRecord);
   hud.showGameOver();
 }
 
@@ -251,6 +260,7 @@ engine.runRenderLoop(() => {
         chaser.grazes++;
         chaser.dist = Math.max(2, chaser.dist - CHASER_SURGE1);
         hud.triggerGrazeFlash();
+        playGraze();
         grazeInvincibleTimer = 0.35;
       }
     }
