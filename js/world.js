@@ -52,12 +52,14 @@ export class World {
     // Two-tone checkerboard on existing track tiles (gt0–gt15)
     // #d4b896 = 212,184,150  #c4a882 = 196,168,130
     const matA = new BABYLON.StandardMaterial('floorA', this._scene);
-    matA.diffuseColor  = new BABYLON.Color3(0.831, 0.722, 0.588); // #d4b896
+    matA.diffuseColor  = new BABYLON.Color3(0.42, 0.32, 0.22);
     matA.specularColor = new BABYLON.Color3(0.02, 0.015, 0.01);
+    matA.emissiveColor = BABYLON.Color3.Black();
 
     const matB = new BABYLON.StandardMaterial('floorB', this._scene);
-    matB.diffuseColor  = new BABYLON.Color3(0.769, 0.659, 0.510); // #c4a882
+    matB.diffuseColor  = new BABYLON.Color3(0.35, 0.26, 0.17);
     matB.specularColor = new BABYLON.Color3(0.02, 0.015, 0.01);
+    matB.emissiveColor = BABYLON.Color3.Black();
 
     for (let i = 0; i < 16; i++) {
       const tile = this._scene.getMeshByName('gt' + i);
@@ -122,5 +124,19 @@ export class World {
     can.position.set(0, 2.0, 0);
     can.parent    = node;
     can.isPickable = false;
+
+    // Support posts
+    const postMat = new BABYLON.StandardMaterial(node.name + '_postMat', this._scene);
+    postMat.diffuseColor = new BABYLON.Color3(0.545, 0.369, 0.235);
+    [-0.9, 0.9].forEach(offset => {
+      const post = BABYLON.MeshBuilder.CreateBox(node.name + '_post' + offset,
+        { width: 0.15, height: 1.8, depth: 0.15 }, this._scene);
+      post.material  = postMat;
+      post.parent    = node;
+      post.position.x = offset;
+      post.position.y = 1.1;
+      post.position.z = 0;
+      post.isPickable = false;
+    });
   }
 }
