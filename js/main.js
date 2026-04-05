@@ -158,6 +158,7 @@ initMuncher(scene);
 })();
 
 // ---- Screen / Menu init -------------------------------------------
+document.body.classList.add('in-menu');
 initScreens();
 initMenu({
   onStartGame:  startGame,    // hoisted — defined below
@@ -236,6 +237,7 @@ function startGame() {
   hud.showPauseBtn();
   hud.updateScore(0);
 
+  document.body.classList.remove('in-menu');
   _startingT = 0;
   gs = 'STARTING';
 }
@@ -255,7 +257,7 @@ function triggerDeathSequence() {
   hud.hidePauseBtn();
   hud.setDanger(0);
   hud.triggerDeathFlash();
-  startMuncherSurge();
+  startMuncherSurge(pPos.x);
 }
 
 function _finalizeGameOver() {
@@ -298,6 +300,7 @@ function goToMainMenu() {
   resetChaser();
   resetPlayer();
   showPlayer();
+  document.body.classList.add('in-menu');
   gs = 'MENU';
   showScreen('main-menu');
 }
@@ -503,6 +506,7 @@ engine.runRenderLoop(() => {
     // t=1500ms: game fully interactive
     if (_deathT >= 1.5 && _deathGoShown) {
       hud.setFadeBlack(0);
+      document.body.classList.add('in-menu');
       gs = 'DEAD';
     }
   }

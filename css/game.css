@@ -26,6 +26,7 @@ html, body {
   display: block;
   touch-action: none;
 }
+body.in-menu #renderCanvas { visibility: hidden; }
 
 /* ================================================================
    SCREEN SYSTEM
