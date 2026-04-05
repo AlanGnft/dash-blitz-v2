@@ -4,48 +4,56 @@
 import { TILE_D, TILE_N, WRAP_Q, DESPAWN_Z, TRACK_W } from './config.js';
 
 // ---- Floor tile constants ------------------------------------
-const FLOOR_COLS  = 8;
-const COL_W       = TRACK_W / FLOOR_COLS;   // 0.9
+const FLOOR_COLS = 8;
+const COL_W      = TRACK_W / FLOOR_COLS;   // 0.9
 
 // ---- Stall constants -----------------------------------------
-const STALL_N     = 3;                       // per side
-const STALL_GAP   = WRAP_Q / STALL_N;        // ~42.7
+const STALL_N   = 3;                        // per side
+const STALL_GAP = WRAP_Q / STALL_N;        // ~42.7
+const STALL_X   = TRACK_W / 2 + 1.85;     // 5.45 — stall table center X
+const SHELF_X   = TRACK_W / 2 + 4.2;      // 7.8 — shelf center X
 
-// ---- Bulb / light constants ----------------------------------
-const BULB_N      = 8;
-const BULB_GAP    = WRAP_Q / BULB_N;         // 16
-
-const STALL_X     = TRACK_W / 2 + 1.85;     // 5.45 — stall table center
-const SHELF_X     = TRACK_W / 2 + 4.5;      // 8.1  — shelf center
+// ---- Light/bulb constants ------------------------------------
+const LAMP_N   = 4;
+const LAMP_GAP = WRAP_Q / LAMP_N;          // 32
+const BULB_N   = 8;
+const BULB_GAP = WRAP_Q / BULB_N;         // 16
 
 const CANOPY_TYPES = [
-  { a: '#cc2200', b: '#f4f4f4' },  // red + white
-  { b: '#f4f4f4', a: '#1144cc' },  // blue + white
-  { a: '#cc8800', b: '#f4f4f4' },  // amber + white
+  ['#cc2200', '#f4f4f4'],
+  ['#1144cc', '#f4f4f4'],
+  ['#cc8800', '#f4f4f4'],
 ];
-
 const PRODUCE_COLS = ['#e87520', '#2d7a1a', '#cc1100', '#f0d020'];
 const PRODUCT_COLS = ['#cc2200', '#1a55cc', '#22aa22', '#cc8800', '#9933cc', '#ee9900'];
 
 export class World {
   constructor(scene) {
-    this._scene   = scene;
-    this._floor   = [];    // TILE_N TransformNodes
+    console.log('[World] init start');
+    this._scene  = scene;
+    this._floor  = [];
     this._stallsL = [];
     this._stallsR = [];
-    this._lights  = [];    // 3 scrolling PointLights
-    this._bulbs   = [];    // { bulb, cord } pairs
-    this._mc      = {};    // material cache
+    this._lamps  = [];
+    this._bulbs  = [];
+    this._mc     = {};
 
     this._initFog();
-    this._initLighting();
+    console.log('[World] fog set');
+    this._initMarketLights();
+    console.log('[World] lights added');
     this._initFloor();
+    console.log('[World] floor created');
     this._initEdgeStripes();
     this._initCeiling();
-    this._initStalls();
-    this._initShelves();
     this._initBulbs();
+    console.log('[World] ceiling + bulbs created');
+    this._initStalls();
+    console.log('[World] stalls created — L:', this._stallsL.length, 'R:', this._stallsR.length);
+    this._initShelves();
+    console.log('[World] shelves created');
     this._initDust();
+    console.log('[World] init complete');
   }
 
   // ---- Public API ------------------------------------------
@@ -53,13 +61,13 @@ export class World {
   update(dt, gameSpeed) {
     const dz = gameSpeed * dt;
 
-    // Floor rows
+    // Floor rows scroll
     for (const node of this._floor) {
       node.position.z -= dz;
       if (node.position.z < DESPAWN_Z) node.position.z += WRAP_Q;
     }
 
-    // Stalls
+    // Stalls scroll
     for (const s of this._stallsL) {
       s.position.z -= dz;
       if (s.position.z < DESPAWN_Z) s.position.z += WRAP_Q;
@@ -69,18 +77,19 @@ export class World {
       if (s.position.z < DESPAWN_Z) s.position.z += WRAP_Q;
     }
 
-    // Scrolling point lights + bulbs
-    for (let i = 0; i < this._bulbs.length; i++) {
-      const b = this._bulbs[i];
+    // Market lamps scroll
+    for (const l of this._lamps) {
+      l.position.z -= dz;
+      if (l.position.z < DESPAWN_Z) l.position.z += WRAP_Q;
+    }
+
+    // Visual bulbs scroll
+    for (const b of this._bulbs) {
       b.bulb.position.z -= dz;
       b.cord.position.z -= dz;
       if (b.bulb.position.z < DESPAWN_Z) {
         b.bulb.position.z += WRAP_Q;
         b.cord.position.z += WRAP_Q;
-      }
-      // Paired light follows bulb
-      if (this._lights[i]) {
-        this._lights[i].position.z = b.bulb.position.z;
       }
     }
   }
@@ -93,78 +102,67 @@ export class World {
       this._stallsL[i].position.z = i * STALL_GAP + 4;
       this._stallsR[i].position.z = i * STALL_GAP + STALL_GAP * 0.5 + 4;
     }
-    for (let i = 0; i < this._bulbs.length; i++) {
-      const z = i * BULB_GAP;
+    for (let i = 0; i < LAMP_N; i++) {
+      this._lamps[i].position.z = i * LAMP_GAP + 4;
+    }
+    for (let i = 0; i < BULB_N; i++) {
+      const z = i * BULB_GAP + 4;
       this._bulbs[i].bulb.position.z = z;
       this._bulbs[i].cord.position.z = z;
-      if (this._lights[i]) this._lights[i].position.z = z;
     }
   }
 
   dispose() {
     for (const node of this._floor) node.dispose();
     for (const s of [...this._stallsL, ...this._stallsR]) s.dispose();
+    for (const l of this._lamps) l.dispose();
     for (const b of this._bulbs) { b.bulb.dispose(); b.cord.dispose(); }
-    for (const l of this._lights) l.dispose();
   }
 
   // ---- Private setup ---------------------------------------
 
   _initFog() {
     const s = this._scene;
+    // Match fog color to clear color so there's no seam at draw distance
     s.fogMode    = BABYLON.Scene.FOGMODE_EXP2;
-    s.fogColor   = new BABYLON.Color3(0.165, 0.122, 0.063);
-    s.fogDensity = 0.04;
+    s.fogColor   = new BABYLON.Color3(0.08, 0.06, 0.04);   // warm dark brown
+    s.fogDensity = 0.01;                                    // was 0.04 — too dense
+    s.clearColor = new BABYLON.Color4(0.08, 0.06, 0.04, 1);
   }
 
-  _initLighting() {
-    const s = this._scene;
-
-    // Warm hemispherical — replaces cold ambient
-    const hemi = s.getLightByName('hemi');
-    if (hemi) {
-      hemi.diffuse     = BABYLON.Color3.FromHexString('#ffe4b0');
-      hemi.groundColor = new BABYLON.Color3(0.545, 0.420, 0.078);
-      hemi.intensity   = 0.6;
-    }
-
-    // Warmer directional
-    const sun = s.getLightByName('sun');
-    if (sun) {
-      sun.diffuse   = new BABYLON.Color3(1.0, 0.941, 0.816);
-      sun.intensity = 0.9;
-    }
-
-    // Dim rim light — was too industrial-bright
-    const rim = s.getLightByName('rim');
-    if (rim) rim.intensity = 0.5;
-
-    // 3 scrolling warm market lamps (paired with hanging bulbs below)
-    const lightZ = [0, -10, -20];
-    for (let i = 0; i < 3; i++) {
+  _initMarketLights() {
+    // Only ADD warm market lights — do NOT touch existing hemi/sun/rim
+    for (let i = 0; i < LAMP_N; i++) {
       const pl = new BABYLON.PointLight('mkLamp' + i,
-        new BABYLON.Vector3(0, 4.5, lightZ[i]), s);
-      pl.diffuse   = BABYLON.Color3.FromHexString('#ffcc77');
-      pl.intensity = 1.2;
-      pl.range     = 12;
-      this._lights.push(pl);
+        new BABYLON.Vector3(0, 4.2, i * LAMP_GAP + 4), this._scene);
+      pl.diffuse   = new BABYLON.Color3(1.0, 0.80, 0.47);
+      pl.specular  = new BABYLON.Color3(0.3, 0.2, 0.0);
+      pl.intensity = 1.4;
+      pl.range     = 18;
+      this._lamps.push(pl);
     }
   }
 
   _initFloor() {
-    const s    = this._scene;
-    const matA = this._pbr('#f5e8d0', 0.8, 0);
-    const matB = this._pbr('#e8d4b8', 0.8, 0);
+    // Use StandardMaterial (not PBR) for mobile WebGL1 compatibility
+    const matA = new BABYLON.StandardMaterial('floorA', this._scene);
+    matA.diffuseColor  = new BABYLON.Color3(0.961, 0.910, 0.816); // #f5e8d0
+    matA.specularColor = new BABYLON.Color3(0.04, 0.04, 0.02);
+
+    const matB = new BABYLON.StandardMaterial('floorB', this._scene);
+    matB.diffuseColor  = new BABYLON.Color3(0.910, 0.831, 0.722); // #e8d4b8
+    matB.specularColor = new BABYLON.Color3(0.04, 0.04, 0.02);
 
     for (let row = 0; row < TILE_N; row++) {
-      const node = new BABYLON.TransformNode('fRow' + row, s);
+      const node = new BABYLON.TransformNode('fRow' + row, this._scene);
       node.position.z = row * TILE_D;
 
       for (let col = 0; col < FLOOR_COLS; col++) {
         const x    = -TRACK_W / 2 + COL_W * (col + 0.5);
-        const tile = this._box('ft' + row + '_' + col, COL_W - 0.02, 0.04, TILE_D - 0.02);
+        const tile = this._box('ft' + row + '_' + col, COL_W - 0.03, 0.06, TILE_D - 0.03);
         tile.material = ((col + row) % 2 === 0) ? matA : matB;
-        tile.position.set(x, 0.001, 0);
+        // Y=0.10 — sits clearly above existing dark track tiles (top surface at Y=0.0)
+        tile.position.set(x, 0.10, 0);
         tile.parent = node;
       }
       this._floor.push(node);
@@ -172,42 +170,52 @@ export class World {
   }
 
   _initEdgeStripes() {
-    const matY  = this._std('#d4b800', '#887700');
+    const mat = new BABYLON.StandardMaterial('edgeStripe', this._scene);
+    mat.diffuseColor  = new BABYLON.Color3(0.83, 0.72, 0.0);
+    mat.emissiveColor = new BABYLON.Color3(0.28, 0.22, 0.0);
+
     const halfW = TRACK_W / 2;
     const len   = WRAP_Q + 60;
     const zc    = WRAP_Q / 2 - 5;
 
-    const sL = this._box('edgeYL', 0.14, 0.07, len);
-    sL.material = matY; sL.position.set(-halfW + 0.10, 0.045, zc);
+    const sL = this._box('edgeYL', 0.14, 0.06, len);
+    sL.material = mat; sL.position.set(-halfW + 0.10, 0.18, zc);
 
-    const sR = this._box('edgeYR', 0.14, 0.07, len);
-    sR.material = matY; sR.position.set(halfW - 0.10, 0.045, zc);
+    const sR = this._box('edgeYR', 0.14, 0.06, len);
+    sR.material = mat; sR.position.set(halfW - 0.10, 0.18, zc);
   }
 
   _initCeiling() {
     const len = WRAP_Q + 80;
     const zc  = WRAP_Q / 2 - 5;
 
-    const ceil = this._box('ceiling', 28, 0.22, len);
-    ceil.material = this._std('#1a1208', '#0d0a06');
+    const matCeil = new BABYLON.StandardMaterial('ceil', this._scene);
+    matCeil.diffuseColor  = new BABYLON.Color3(0.08, 0.065, 0.05);
+    matCeil.emissiveColor = new BABYLON.Color3(0.04, 0.03, 0.02);
+
+    const ceil = this._box('ceiling', 28, 0.24, len);
+    ceil.material = matCeil;
     ceil.position.set(0, 5.62, zc);
 
-    // Longitudinal beams
-    const beamMat = this._std('#110f08');
+    const matBeam = new BABYLON.StandardMaterial('beam', this._scene);
+    matBeam.diffuseColor = new BABYLON.Color3(0.07, 0.055, 0.04);
     for (let b = 0; b < 4; b++) {
-      const bm = this._box('cBeam' + b, 0.18, 0.14, len);
-      bm.material = beamMat;
+      const bm = this._box('cBeam' + b, 0.18, 0.16, len);
+      bm.material = matBeam;
       bm.position.set(-5.4 + b * 3.6, 5.5, zc);
     }
   }
 
   _initBulbs() {
-    const matBulb = this._std('#fff8e8', '#ddbb66');
-    const matCord = this._std('#222222');
+    const matBulb = new BABYLON.StandardMaterial('bulbMat', this._scene);
+    matBulb.diffuseColor  = new BABYLON.Color3(1.0, 0.97, 0.88);
+    matBulb.emissiveColor = new BABYLON.Color3(0.7, 0.55, 0.2);
 
-    // Only 3 bulbs match the 3 scrolling lights; add 5 more visual-only bulbs
+    const matCord = new BABYLON.StandardMaterial('cordMat', this._scene);
+    matCord.diffuseColor = new BABYLON.Color3(0.14, 0.14, 0.14);
+
     for (let i = 0; i < BULB_N; i++) {
-      const z = i * BULB_GAP;
+      const z = i * BULB_GAP + 4;
 
       const bulb = this._sph('bulb' + i, 0.24);
       bulb.material = matBulb;
@@ -218,53 +226,59 @@ export class World {
       cord.position.set(0, 5.2, z);
 
       this._bulbs.push({ bulb, cord });
-
-      // Extend lights array to cover all 8 bulbs (reuse first 3 lights cyclically)
-      if (i >= 3) this._lights.push(null);  // visual-only bulbs have no paired light
     }
   }
 
   _makeStall(id, side) {
-    const s       = this._scene;
     const typeIdx = id % CANOPY_TYPES.length;
-    const ctype   = CANOPY_TYPES[typeIdx];
+    const colors  = CANOPY_TYPES[typeIdx];
     const xSign   = side === 'L' ? -1 : 1;
     const xBase   = STALL_X * xSign;
 
-    const node = new BABYLON.TransformNode('stall' + side + id, s);
+    const node = new BABYLON.TransformNode('stall' + side + id, this._scene);
 
-    // Table
+    // Table (wood)
+    const matWood = new BABYLON.StandardMaterial('wood' + id, this._scene);
+    matWood.diffuseColor = new BABYLON.Color3(0.545, 0.412, 0.078);
     const tbl = this._box('tbl' + side + id, 2.5, 0.7, 2.0);
-    tbl.material = this._pbr('#8B6914', 0.8, 0.04);
+    tbl.material = matWood;
     tbl.position.set(xBase, 0.35, 0);
     tbl.parent = node;
 
     // Support poles
+    const matPole = new BABYLON.StandardMaterial('pole' + id, this._scene);
+    matPole.diffuseColor = new BABYLON.Color3(0.18, 0.18, 0.18);
     for (let p = 0; p < 2; p++) {
       const px   = xBase + (p === 0 ? -1.1 : 1.1) * xSign;
       const pole = this._cyl('pole' + side + id + p, 0.08, 2.2);
-      pole.material = this._std('#2e2e2e');
+      pole.material = matPole;
       pole.position.set(px, 1.1, 0);
       pole.parent = node;
     }
 
     // Canopy — 4 alternating stripes
-    const sc = [ctype.a, ctype.b, ctype.a, ctype.b];
     for (let st = 0; st < 4; st++) {
+      const hex = colors[st % 2];
+      const mat = new BABYLON.StandardMaterial('cst' + id + st, this._scene);
+      const c   = BABYLON.Color3.FromHexString(hex);
+      mat.diffuseColor  = c;
+      mat.emissiveColor = c.scale(0.35);
       const stripe = this._box('cSt' + side + id + st, 0.625, 0.07, 1.35);
-      stripe.material = this._std(sc[st], sc[st]);   // emissive = diffuse for glow
+      stripe.material = mat;
       stripe.position.set(xBase + (-0.9375 + st * 0.625) * xSign, 2.4, 0);
       stripe.parent = node;
     }
 
-    // Produce (3 items on table)
-    const produceXs = [xBase - 0.75 * xSign, xBase, xBase + 0.75 * xSign];
+    // Produce on table
+    const produceXs = [-0.75 * xSign, 0, 0.75 * xSign];
     for (let p = 0; p < 3; p++) {
-      const ci   = (id * 3 + p) % PRODUCE_COLS.length;
-      const r    = 0.16 + (p % 2) * 0.04;
+      const ci  = (id * 3 + p) % PRODUCE_COLS.length;
+      const r   = 0.17 + (p % 2) * 0.04;
+      const mat = new BABYLON.StandardMaterial('prd' + id + p, this._scene);
+      mat.diffuseColor  = BABYLON.Color3.FromHexString(PRODUCE_COLS[ci]);
       const prod = this._sph('prod' + side + id + p, r * 2);
-      prod.material = this._std(PRODUCE_COLS[ci]);
-      prod.position.set(produceXs[p], 0.7 + r, 0.2);
+      prod.material = mat;
+      prod.position.set(xBase + produceXs[p], 0.7 + r, 0.2);
       prod.parent = node;
     }
 
@@ -273,51 +287,56 @@ export class World {
 
   _initStalls() {
     for (let i = 0; i < STALL_N; i++) {
-      const zL = i * STALL_GAP + 4;
-      const zR = i * STALL_GAP + STALL_GAP * 0.5 + 4;   // stagger L/R
-
       const sL = this._makeStall(i, 'L');
-      sL.position.z = zL;
+      sL.position.z = i * STALL_GAP + 4;
       this._stallsL.push(sL);
 
       const sR = this._makeStall(i + STALL_N, 'R');
-      sR.position.z = zR;
+      sR.position.z = i * STALL_GAP + STALL_GAP * 0.5 + 4;
       this._stallsR.push(sR);
     }
   }
 
   _initShelves() {
-    const LEN    = WRAP_Q + 80;
-    const ZC     = WRAP_Q / 2 - 5;
-    const matSh  = this._std('#d6cdb5');
-    const matDiv = this._std('#b8a888');
+    const LEN = WRAP_Q + 80;
+    const ZC  = WRAP_Q / 2 - 5;   // centered at z=59, extends -45 to 163
+
+    const matSh = new BABYLON.StandardMaterial('shelfBack', this._scene);
+    matSh.diffuseColor = new BABYLON.Color3(0.84, 0.80, 0.71);
+
+    const matPlk = new BABYLON.StandardMaterial('shelfPlank', this._scene);
+    matPlk.diffuseColor = new BABYLON.Color3(0.72, 0.66, 0.55);
 
     for (let side = 0; side < 2; side++) {
-      const sx = side === 0 ? -SHELF_X : SHELF_X;
-      const fx = sx + (side === 0 ? 0.24 : -0.24);  // product face X
+      const sx    = side === 0 ? -SHELF_X : SHELF_X;
+      const faceX = sx + (side === 0 ? 0.22 : -0.22);
 
-      // Shelf back panel
-      const sh = this._box('sh' + side, 0.45, 3.6, LEN);
-      sh.material = matSh;
-      sh.position.set(sx, 1.8, ZC);
+      // Back panel
+      const panel = this._box('sh' + side, 0.44, 3.6, LEN);
+      panel.material = matSh;
+      panel.position.set(sx, 1.8, ZC);
 
-      // 3 horizontal shelf planks
+      // 3 shelf planks
       for (let sp = 0; sp < 3; sp++) {
-        const div = this._box('shP' + side + sp, 0.47, 0.07, LEN);
-        div.material = matDiv;
-        div.position.set(sx, 0.7 + sp * 0.95, ZC);
+        const plk = this._box('shPlk' + side + sp, 0.46, 0.07, LEN);
+        plk.material = matPlk;
+        plk.position.set(sx, 0.7 + sp * 0.95, ZC);
       }
 
-      // Product boxes along shelves (~80 per side)
+      // Product boxes
       for (let k = 0; k < 80; k++) {
         const z   = (k / 80) * LEN - LEN / 2 + ZC;
         const row = k % 3;
         const y   = 0.82 + row * 0.95;
         const ci  = (k * 7 + side * 3) % PRODUCT_COLS.length;
 
-        const prod = this._box('pr' + side + '_' + k, 0.20, 0.30, 0.18);
-        prod.material = this._std(PRODUCT_COLS[ci]);
-        prod.position.set(fx, y, z);
+        const mat = new BABYLON.StandardMaterial('pr' + side + k, this._scene);
+        mat.diffuseColor  = BABYLON.Color3.FromHexString(PRODUCT_COLS[ci]);
+        mat.emissiveColor = BABYLON.Color3.FromHexString(PRODUCT_COLS[ci]).scale(0.15);
+
+        const prod = this._box('prb' + side + '_' + k, 0.20, 0.30, 0.18);
+        prod.material = mat;
+        prod.position.set(faceX, y, z);
       }
     }
   }
@@ -327,58 +346,34 @@ export class World {
     const tex = new BABYLON.DynamicTexture('dustTex', { width: 32, height: 32 }, s, false);
     const ctx = tex.getContext();
     const grd = ctx.createRadialGradient(16, 16, 0, 16, 16, 14);
-    grd.addColorStop(0, 'rgba(240,225,200,0.6)');
+    grd.addColorStop(0, 'rgba(240,225,200,0.55)');
     grd.addColorStop(1, 'rgba(240,225,200,0)');
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 32, 32);
+    ctx.fillStyle = grd; ctx.fillRect(0, 0, 32, 32);
     tex.update();
 
-    const ps = new BABYLON.ParticleSystem('dust', 30, s);
+    const ps = new BABYLON.ParticleSystem('dust', 25, s);
     ps.particleTexture = tex;
-    ps.emitter         = new BABYLON.Vector3(0, 0.3, 15);
-
+    ps.emitter         = new BABYLON.Vector3(0, 0.4, 14);
     ps.createBoxEmitter(
       new BABYLON.Vector3(-0.02, 0.02, 0),
-      new BABYLON.Vector3(0.02, 0.06, 0),
-      new BABYLON.Vector3(-3.5, 0, -15),
-      new BABYLON.Vector3(3.5, 0.5, 20)
+      new BABYLON.Vector3(0.02, 0.05, 0),
+      new BABYLON.Vector3(-3.2, 0, -12),
+      new BABYLON.Vector3(3.2, 0.4, 18)
     );
-
-    ps.minSize      = 0.05; ps.maxSize      = 0.10;
-    ps.minLifeTime  = 8;    ps.maxLifeTime  = 14;
+    ps.minSize      = 0.06; ps.maxSize      = 0.12;
+    ps.minLifeTime  = 9;    ps.maxLifeTime  = 15;
     ps.emitRate     = 3;
-    ps.minEmitPower = 0.01; ps.maxEmitPower = 0.04;
+    ps.minEmitPower = 0.01; ps.maxEmitPower = 0.03;
     ps.updateSpeed  = 0.01;
-    ps.color1       = new BABYLON.Color4(0.94, 0.88, 0.78, 0.07);
-    ps.color2       = new BABYLON.Color4(0.94, 0.88, 0.78, 0.04);
-    ps.colorDead    = new BABYLON.Color4(0.94, 0.88, 0.78, 0);
-    ps.blendMode    = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
-    ps.gravity      = new BABYLON.Vector3(0, 0.008, 0);
+    ps.color1    = new BABYLON.Color4(0.94, 0.88, 0.78, 0.06);
+    ps.color2    = new BABYLON.Color4(0.94, 0.88, 0.78, 0.03);
+    ps.colorDead = new BABYLON.Color4(0.94, 0.88, 0.78, 0);
+    ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
+    ps.gravity   = new BABYLON.Vector3(0, 0.007, 0);
     ps.start();
   }
 
-  // ---- Material cache helpers ------------------------------------
-
-  _std(hex, emHex) {
-    const k = hex + (emHex || '');
-    if (this._mc[k]) return this._mc[k];
-    const m = new BABYLON.StandardMaterial('sm_' + k, this._scene);
-    m.diffuseColor = BABYLON.Color3.FromHexString(hex);
-    if (emHex) m.emissiveColor = BABYLON.Color3.FromHexString(emHex);
-    return (this._mc[k] = m);
-  }
-
-  _pbr(hex, roughness, metallic) {
-    const k = 'p' + hex + roughness + metallic;
-    if (this._mc[k]) return this._mc[k];
-    const m = new BABYLON.PBRMetallicRoughnessMaterial('pbr_' + k, this._scene);
-    m.baseColor = BABYLON.Color3.FromHexString(hex);
-    m.roughness = roughness;
-    m.metallic  = metallic;
-    return (this._mc[k] = m);
-  }
-
-  // ---- Mesh factory helpers ---------------------------------------
+  // ---- Mesh factory helpers ----------------------------------
 
   _box(n, w, h, d) {
     const m = BABYLON.MeshBuilder.CreateBox(n,
