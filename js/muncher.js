@@ -97,6 +97,36 @@ export function resetChaser() {
   _muncherT     = 0;
 }
 
+let _surgeStartZ = 0;
+
+export function startMuncherSurge() {
+  _surgeStartZ = _muncher.position.z;
+}
+
+export function updateMuncherSurge(progress) {
+  const targetZ = -0.5;
+  _muncher.position.z = _surgeStartZ + (targetZ - _surgeStartZ) * progress;
+  _muncher.position.x *= (1 - progress * 0.5);
+  const jawAng = 0.45 + progress * 0.35;
+  _mJawU.position.y  = 2.88 + jawAng * 1.3;
+  _mJawL.position.y  = 1.94 - jawAng * 0.9;
+  _mMouth.position.y = 2.4  + jawAng * 0.2;
+}
+
+export function snapMuncherJawShut() {
+  _mJawU.position.y  = 2.88;
+  _mJawL.position.y  = 1.94;
+  _mMouth.position.y = 2.4;
+}
+
+export function muncherIdleAnim(dt) {
+  _muncherT += dt;
+  const jawAng = Math.abs(Math.sin(_muncherT * 2.8)) * 0.12;
+  _mJawU.position.y  = 2.88 + jawAng * 1.3;
+  _mJawL.position.y  = 1.94 - jawAng * 0.9;
+  _mMouth.position.y = 2.4  + jawAng * 0.2;
+}
+
 // Returns dangerT [0-1] so main.js can check game-over condition.
 export function updateMuncher(dt, pPosX, cameraX) {
   // Chaser retreats while player runs clean

@@ -15,6 +15,8 @@ const goCoinsEl    = document.getElementById('goCoins');
 const goBestDistEl = document.getElementById('goBestDist');
 const goBestCoinsEl= document.getElementById('goBestCoins');
 const newBestEl    = document.getElementById('newBestBanner');
+const deathFlashEl = document.getElementById('deathFlash');
+const fadeBlackEl  = document.getElementById('fadeBlack');
 
 export const showHUD       = () => { hudEl.style.display = 'flex'; };
 export const hideHUD       = () => { hudEl.style.display = 'none'; };
@@ -32,8 +34,34 @@ export function triggerGrazeFlash() {
 }
 
 export const hideStartScreen = () => startScr.classList.add('hidden');
-export const showGameOver    = () => gameOverScr.classList.remove('hidden');
-export const hideGameOver    = () => gameOverScr.classList.add('hidden');
+
+export function triggerDeathFlash() {
+  deathFlashEl.classList.remove('active');
+  void deathFlashEl.offsetWidth;
+  deathFlashEl.classList.add('active');
+}
+
+export const setFadeBlack = v => { fadeBlackEl.style.opacity = v; };
+
+export function showGameOver() {
+  gameOverScr.classList.remove('hidden');
+  gameOverScr.style.transform = 'translateY(60px)';
+  gameOverScr.style.opacity = '0';
+  gameOverScr.style.pointerEvents = 'none';
+  void gameOverScr.offsetWidth;
+  gameOverScr.style.transition = 'opacity 0.35s ease-out, transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1)';
+  gameOverScr.style.transform = 'translateY(0)';
+  gameOverScr.style.opacity = '1';
+  gameOverScr.style.pointerEvents = 'auto';
+}
+
+export function hideGameOver() {
+  gameOverScr.style.transition = 'none';
+  gameOverScr.style.transform = '';
+  gameOverScr.style.opacity = '';
+  gameOverScr.style.pointerEvents = '';
+  gameOverScr.classList.add('hidden');
+}
 
 export function setGoStats(distance, coins, bestDist, bestCoins, newDistRecord, newCoinRecord) {
   goCoinsEl.textContent     = coins;

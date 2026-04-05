@@ -258,3 +258,29 @@ html, body {
   opacity: 0;
   transition: opacity 0.15s;
 }
+
+/* ---- Death sequence overlays ---- */
+#deathFlash {
+  position: fixed; inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+#deathFlash.active {
+  animation: deathFlashAnim 0.25s ease-out forwards;
+}
+@keyframes deathFlashAnim {
+  0%   { opacity: 0; }
+  20%  { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+#fadeBlack {
+  position: fixed; inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 25;
+  transition: opacity 0.3s ease-out;
+}

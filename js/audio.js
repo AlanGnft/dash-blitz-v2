@@ -120,6 +120,19 @@ export function playDeath() {
   });
 }
 
+export function playMuncherRoar() {
+  oneShot(c => {
+    const osc  = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.value = 90;
+    gain.gain.setValueAtTime(0.38, c.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, c.currentTime + 0.3);
+    osc.connect(gain); gain.connect(c.destination);
+    osc.start(); osc.stop(c.currentTime + 0.32);
+  });
+}
+
 // ---- Muncher growl (continuous, per-frame) ---------------------
 
 export function startMuncherGrowl(ratio) {

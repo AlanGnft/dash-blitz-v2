@@ -8,12 +8,15 @@ import { LANE_X, TRACK_W, TILE_D, TILE_N, WRAP_Q,
 import * as hud from './hud.js';
 import { initEffects, burstDust, triggerCamShake, updateEffects } from './effects.js';
 import { initPlayer, resetPlayer, updatePlayer, pPos, ps,
-         doLeft, doRight, doJump, doSlam } from './player.js';
+         doLeft, doRight, doJump, doSlam,
+         killPlayerPop, hidePlayer, showPlayer } from './player.js';
 import { initObstacles, spawnObs, despawnObs, clearObs,
          obsActive, checkCollisions } from './obstacles.js';
-import { initCoins, resetCoins, updateCoins, coinCount } from './coins.js';
-import { initMuncher, resetChaser, updateMuncher, chaser } from './muncher.js';
-import { initAudio, startMusic, stopMusic, playGraze, playDeath } from './audio.js';
+import { initCoins, resetCoins, updateCoins, coinCount, burstCoinsAt } from './coins.js';
+import { initMuncher, resetChaser, updateMuncher, chaser,
+         startMuncherSurge, updateMuncherSurge, snapMuncherJawShut, muncherIdleAnim } from './muncher.js';
+import { initAudio, startMusic, stopMusic, playGraze, playDeath,
+         playMuncherRoar } from './audio.js';
 import { saveHighScore, getHighScore } from './highscore.js';
 
 // ---- Engine & Scene ------------------------------------------------
@@ -132,7 +135,14 @@ let speed      = BASE_SPD;
 let spawnTimer = 0;
 let spawnIv    = SPAWN_T0;
 
+// ---- Death sequence state ------------------------------------
+let _deathT    = 0;
+let _deathGoShown = false;
+let _applePopped  = false;
+let _roarPlayed   = false;
+
 function startGame() {
+  if (gs === 'DYING') return;
   initAudio();
   score      = 0;
   speed      = BASE_SPD;
@@ -151,23 +161,36 @@ function startGame() {
   hud.showHUD();
   hud.showCoinHud();
   hud.updateScore(0);
+  hud.setFadeBlack(0);
+  showPlayer();
 
   gs = 'PLAY';
   startMusic();
 }
 
-function triggerGameOver() {
-  gs = 'DEAD';
+function triggerDeathSequence() {
+  if (gs !== 'PLAY') return;
+  gs = 'DYING';
+  _deathT       = 0;
+  _deathGoShown = false;
+  _applePopped  = false;
+  _roarPlayed   = false;
   stopMusic();
   playDeath();
   hud.hideHUD();
   hud.hideCoinHud();
   hud.setDanger(0);
+  hud.triggerDeathFlash();
+  startMuncherSurge();
+}
+
+function _finalizeGameOver() {
   hud.setFinalScore(score);
   const { newDistanceRecord, newCoinRecord } = saveHighScore(score, coinCount);
   const hs = getHighScore();
   hud.setGoStats(score, coinCount, hs.distance, hs.coins, newDistanceRecord, newCoinRecord);
   hud.showGameOver();
+  hidePlayer();
 }
 
 // ---- Input ---------------------------------------------------------
@@ -252,10 +275,10 @@ engine.runRenderLoop(() => {
     if (grazeInvincibleTimer > 0) grazeInvincibleTimer -= dt;
     const hit = checkCollisions(pPos);
     if (hit === 'HIT' && grazeInvincibleTimer <= 0) {
-      triggerGameOver();
+      triggerDeathSequence();
     } else if (hit === 'GRAZE') {
       if (chaser.grazes >= 1) {
-        triggerGameOver();
+        triggerDeathSequence();
       } else {
         chaser.grazes++;
         chaser.dist = Math.max(2, chaser.dist - CHASER_SURGE1);
@@ -265,7 +288,63 @@ engine.runRenderLoop(() => {
       }
     }
 
-    if (chaser.dist <= 0) triggerGameOver();
+    if (chaser.dist <= 0) triggerDeathSequence();
+  }
+
+  if (gs === 'DYING') {
+    _deathT += dt;
+
+    // t=0-100ms: slow-mo idle — muncher jaw moves lazily
+    if (_deathT < 0.1) {
+      muncherIdleAnim(dt * 0.15);
+    }
+
+    // t=100-400ms: muncher surges forward hard
+    if (_deathT >= 0.1 && _deathT < 0.4) {
+      updateMuncherSurge((_deathT - 0.1) / 0.3);
+    }
+
+    // t=400-450ms: apple pops (scale 1 → 0)
+    if (_deathT >= 0.4 && _deathT < 0.45) {
+      killPlayerPop((_deathT - 0.4) / 0.05);
+    }
+
+    // t=450ms: particle burst, freeze apple at scale 0
+    if (_deathT >= 0.45 && !_applePopped) {
+      _applePopped = true;
+      killPlayerPop(1);
+      burstCoinsAt(pPos.x, pPos.y + 0.5, 0);
+    }
+
+    // t=400-500ms: hard camera shake (3 oscillations)
+    if (_deathT >= 0.4 && _deathT < 0.5) {
+      camera.position.y = 7 + Math.sin((_deathT - 0.4) / 0.1 * Math.PI * 6) * 0.25;
+    } else if (_deathT >= 0.5) {
+      camera.position.y = 7;
+    }
+
+    // t=500ms: jaw snaps shut + roar
+    if (_deathT >= 0.5 && !_roarPlayed) {
+      _roarPlayed = true;
+      snapMuncherJawShut();
+      playMuncherRoar();
+    }
+
+    // t=700-1000ms: fade to black
+    if (_deathT >= 0.7) {
+      hud.setFadeBlack(Math.min(1, (_deathT - 0.7) / 0.3));
+    }
+
+    // t=1000ms: show game over screen
+    if (_deathT >= 1.0 && !_deathGoShown) {
+      _deathGoShown = true;
+      _finalizeGameOver();
+    }
+
+    // t=1200ms: game fully interactive
+    if (_deathT >= 1.2 && _deathGoShown) {
+      gs = 'DEAD';
+    }
   }
 
   scene.render();

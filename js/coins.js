@@ -201,6 +201,12 @@ function _burst(x, z) {
   _coinPS.start();
 }
 
+export function burstCoinsAt(x, y, z) {
+  _coinPS.emitter.set(x, y, z);
+  _coinPS.manualEmitCount = 30;
+  _coinPS.start();
+}
+
 export function updateCoins(dt, speed, pPos) {
   // Spawn timer
   _spawnTimer += dt;
