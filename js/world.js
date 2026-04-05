@@ -10,7 +10,7 @@ const COL_W      = TRACK_W / FLOOR_COLS;   // 0.9
 // ---- Stall constants -----------------------------------------
 const STALL_N   = 3;                        // per side
 const STALL_GAP = WRAP_Q / STALL_N;        // ~42.7
-const STALL_X   = TRACK_W / 2 + 1.85;     // 5.45 — stall table center X
+const STALL_X   = TRACK_W / 2 + 2.6;      // 6.2 — stall table center X
 const SHELF_X   = TRACK_W / 2 + 4.2;      // 7.8 — shelf center X
 
 // ---- Light/bulb constants ------------------------------------
@@ -146,11 +146,11 @@ export class World {
   _initFloor() {
     // Use StandardMaterial (not PBR) for mobile WebGL1 compatibility
     const matA = new BABYLON.StandardMaterial('floorA', this._scene);
-    matA.diffuseColor  = new BABYLON.Color3(0.961, 0.910, 0.816); // #f5e8d0
+    matA.diffuseColor  = new BABYLON.Color3(0.831, 0.722, 0.588); // #d4b896
     matA.specularColor = new BABYLON.Color3(0.04, 0.04, 0.02);
 
     const matB = new BABYLON.StandardMaterial('floorB', this._scene);
-    matB.diffuseColor  = new BABYLON.Color3(0.910, 0.831, 0.722); // #e8d4b8
+    matB.diffuseColor  = new BABYLON.Color3(0.769, 0.659, 0.510); // #c4a882
     matB.specularColor = new BABYLON.Color3(0.04, 0.04, 0.02);
 
     for (let row = 0; row < TILE_N; row++) {
@@ -242,7 +242,7 @@ export class World {
     matWood.diffuseColor = new BABYLON.Color3(0.545, 0.412, 0.078);
     const tbl = this._box('tbl' + side + id, 2.5, 0.7, 2.0);
     tbl.material = matWood;
-    tbl.position.set(xBase, 0.35, 0);
+    tbl.position.set(xBase, 0.1, 0);
     tbl.parent = node;
 
     // Support poles
@@ -265,7 +265,7 @@ export class World {
       mat.emissiveColor = c.scale(0.35);
       const stripe = this._box('cSt' + side + id + st, 0.625, 0.07, 1.35);
       stripe.material = mat;
-      stripe.position.set(xBase + (-0.9375 + st * 0.625) * xSign, 2.4, 0);
+      stripe.position.set(xBase + (-0.9375 + st * 0.625) * xSign, 2.0, 0);
       stripe.parent = node;
     }
 
