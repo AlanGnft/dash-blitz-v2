@@ -3,7 +3,7 @@
 // ================================================================
 import { LANE_X, TRACK_W, TILE_D, TILE_N, WRAP_Q,
          SPAWN_Z, DESPAWN_Z, BASE_SPD, MAX_SPD, ACCEL,
-         SPAWN_T0, SPAWN_TMIN, CHASER_SURGE1 } from './config.js';
+         SPAWN_T0, SPAWN_TMIN, CHASER_SURGE1, GROUND_Y } from './config.js';
 
 import * as hud from './hud.js';
 import { initEffects, burstDust, triggerCamShake, updateEffects } from './effects.js';
@@ -11,12 +11,13 @@ import { initPlayer, resetPlayer, updatePlayer, pPos, ps,
          doLeft, doRight, doJump, doSlam,
          killPlayerPop, hidePlayer, showPlayer } from './player.js';
 import { initObstacles, spawnObs, despawnObs, clearObs,
-         obsActive, checkCollisions } from './obstacles.js';
+         obsActive, checkCollisions,
+         spawnDouble, spawnBarrier } from './obstacles.js';
 import { initCoins, resetCoins, updateCoins, coinCount, burstCoinsAt } from './coins.js';
 import { initMuncher, resetChaser, updateMuncher, chaser,
          startMuncherSurge, updateMuncherSurge, snapMuncherJawShut, muncherIdleAnim } from './muncher.js';
 import { initAudio, startMusic, stopMusic, playGraze, playDeath,
-         playMuncherRoar } from './audio.js';
+         playMuncherRoar, playMilestone } from './audio.js';
 import { saveHighScore, getHighScore } from './highscore.js';
 
 // ---- Engine & Scene ------------------------------------------------
@@ -150,9 +151,23 @@ let _deathGoShown = false;
 let _applePopped  = false;
 let _roarPlayed   = false;
 
+// ---- Progression milestones ----------------------------------
+const MILESTONES = [
+  { score: 100,  text: 'PICKING UP SPEED',       spawnMult: 0.80 },
+  { score: 250,  text: "IT'S GETTING DANGEROUS", spawnMult: 0.72 },
+  { score: 500,  text: 'FULL SPEED',             spawnMult: 0.65 },
+  { score: 1000, text: 'UNSTOPPABLE',            spawnMult: 0.55 },
+];
+let _milestoneHit  = [false, false, false, false];
+let _progressPhase = 0;
+let _spawnMult     = 1.0;
+
 function startGame() {
   if (gs === 'DYING') return;
   initAudio();
+  _milestoneHit  = [false, false, false, false];
+  _progressPhase = 0;
+  _spawnMult     = 1.0;
   score      = 0;
   speed      = BASE_SPD;
   spawnTimer = 0;
@@ -247,11 +262,49 @@ engine.runRenderLoop(() => {
     score += speed * dt * 0.5;
     hud.updateScore(score);
 
-    // Obstacle spawn interval tightens with speed
+    // Milestone checks
+    for (let _mi = 0; _mi < MILESTONES.length; _mi++) {
+      if (!_milestoneHit[_mi] && score >= MILESTONES[_mi].score) {
+        _milestoneHit[_mi] = true;
+        _progressPhase = _mi + 1;
+        _spawnMult = MILESTONES[_mi].spawnMult;
+        hud.showMilestoneText(MILESTONES[_mi].text);
+        playMilestone();
+        if (_mi === 1) {
+          // 250m: muncher closer
+          chaser.dist = Math.max(chaser.dist - 4, 8);
+        }
+        if (_mi === 2) {
+          // 500m: instant max speed + shake
+          speed = MAX_SPD;
+          triggerCamShake();
+        }
+        if (_mi === 3) {
+          // 1000m: gold burst
+          hud.triggerGoldBurst();
+          burstCoinsAt(LANE_X[0], GROUND_Y + 0.5, 5);
+          burstCoinsAt(LANE_X[1], GROUND_Y + 0.5, 5);
+          burstCoinsAt(LANE_X[2], GROUND_Y + 0.5, 5);
+        }
+      }
+    }
+
+    // Obstacle spawn interval tightens with speed and milestone
     const speedT = (speed - BASE_SPD) / (MAX_SPD - BASE_SPD);
-    spawnIv = SPAWN_T0 - speedT * (SPAWN_T0 - SPAWN_TMIN);
+    spawnIv = (SPAWN_T0 - speedT * (SPAWN_T0 - SPAWN_TMIN)) * _spawnMult;
     spawnTimer += dt;
-    if (spawnTimer >= spawnIv) { spawnObs(); spawnTimer = 0; }
+    if (spawnTimer >= spawnIv) {
+      if (_progressPhase >= 4 && Math.random() < 0.45) {
+        spawnDouble();
+      } else if (_progressPhase >= 3 && Math.random() < 0.25) {
+        spawnBarrier();
+      } else if (_progressPhase >= 2 && Math.random() < 0.35) {
+        spawnDouble();
+      } else {
+        spawnObs();
+      }
+      spawnTimer = 0;
+    }
 
     // Track scroll
     scrollTrack(dt, speed);

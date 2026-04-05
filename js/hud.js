@@ -19,6 +19,8 @@ const deathFlashEl = document.getElementById('deathFlash');
 const fadeBlackEl  = document.getElementById('fadeBlack');
 const startBestDistEl  = document.getElementById('startBestDist');
 const startBestCoinsEl = document.getElementById('startBestCoins');
+const milestoneEl = document.getElementById('milestoneText');
+const goldBurstEl = document.getElementById('goldBurst');
 
 export const showHUD       = () => { hudEl.style.display = 'flex'; };
 export const hideHUD       = () => { hudEl.style.display = 'none'; };
@@ -74,6 +76,24 @@ export function setGoStats(distance, coins, bestDist, bestCoins, newDistRecord, 
   } else {
     newBestEl.classList.add('hidden');
   }
+}
+
+export function showMilestoneText(text) {
+  milestoneEl.textContent = text;
+  milestoneEl.classList.remove('slide-in', 'slide-out');
+  void milestoneEl.offsetWidth;
+  milestoneEl.classList.add('slide-in');
+  clearTimeout(milestoneEl._hideTimer);
+  milestoneEl._hideTimer = setTimeout(() => {
+    milestoneEl.classList.remove('slide-in');
+    milestoneEl.classList.add('slide-out');
+  }, 1800);
+}
+
+export function triggerGoldBurst() {
+  goldBurstEl.classList.remove('active');
+  void goldBurstEl.offsetWidth;
+  goldBurstEl.classList.add('active');
 }
 
 export function updateStartBest(dist, coins) {

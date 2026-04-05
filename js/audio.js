@@ -133,6 +133,25 @@ export function playMuncherRoar() {
   });
 }
 
+export function playMilestone() {
+  oneShot(c => {
+    const t = c.currentTime;
+    [440, 554, 659].forEach((freq, i) => {
+      const osc  = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = 'square';
+      osc.frequency.value = freq;
+      const s = t + i * 0.07;
+      gain.gain.setValueAtTime(0, s);
+      gain.gain.linearRampToValueAtTime(0.18, s + 0.01);
+      gain.gain.linearRampToValueAtTime(0.07, s + 0.07);
+      gain.gain.linearRampToValueAtTime(0, s + 0.11);
+      osc.connect(gain); gain.connect(c.destination);
+      osc.start(s); osc.stop(s + 0.12);
+    });
+  });
+}
+
 // ---- Muncher growl (continuous, per-frame) ---------------------
 
 export function startMuncherGrowl(ratio) {
