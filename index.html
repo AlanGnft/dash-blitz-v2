@@ -1029,6 +1029,92 @@ canvas.addEventListener('touchend', e => {
   }
 }, { passive: true });
 
+// ---- Coin Trail Particle System ------------------------------------
+// Faint gold trail on apple when collecting 3+ coins in sequence.
+const coinTrailPS = new BABYLON.ParticleSystem('coinTrail', 32, scene);
+coinTrailPS.particleTexture = new BABYLON.Texture(_ctc.toDataURL(), scene);
+coinTrailPS.emitter         = new BABYLON.Vector3(0, GROUND_Y, 0);
+coinTrailPS.minEmitBox      = new BABYLON.Vector3(-0.15, -0.15, -0.15);
+coinTrailPS.maxEmitBox      = new BABYLON.Vector3(0.15,  0.15,  0.15);
+coinTrailPS.direction1      = new BABYLON.Vector3(-0.5, 0.2, 1.5);
+coinTrailPS.direction2      = new BABYLON.Vector3(0.5,  0.8, 3.0);
+coinTrailPS.minSize         = 0.04; coinTrailPS.maxSize     = 0.12;
+coinTrailPS.minLifeTime     = 0.10; coinTrailPS.maxLifeTime = 0.22;
+coinTrailPS.minEmitPower    = 0.5;  coinTrailPS.maxEmitPower = 1.5;
+coinTrailPS.emitRate        = 0;    // controlled manually
+coinTrailPS.gravity         = new BABYLON.Vector3(0, 1.5, 0);
+coinTrailPS.color1          = new BABYLON.Color4(1.0, 0.90, 0.2, 0.7);
+coinTrailPS.color2          = new BABYLON.Color4(0.95, 0.72, 0.0, 0.4);
+coinTrailPS.colorDead       = new BABYLON.Color4(0.8, 0.55, 0.0, 0);
+coinTrailPS.blendMode       = BABYLON.ParticleSystem.BLENDMODE_ADD;
+coinTrailPS.start();  // start with emitRate=0; we set rate each frame
+
+let coinStreak     = 0;   // consecutive coins collected
+let coinStreakTimer = 0;  // resets streak after gap
+
+// ---- Speed Lines ---------------------------------------------------
+// Thin planes radiating from a point just ahead of camera, billboard-facing.
+// Only visible above 60% of max speed. Cheap: 12 planes, opacity-driven.
+const SPEEDLINE_COUNT   = 12;
+const SPEEDLINE_THRESH  = 0.60;  // fraction of max speed to start showing
+const speedLines = [];
+
+const matSpeedLine = new BABYLON.StandardMaterial('speedLine', scene);
+matSpeedLine.diffuseColor  = new BABYLON.Color3(1, 1, 1);
+matSpeedLine.emissiveColor = new BABYLON.Color3(0.85, 0.85, 0.88);
+matSpeedLine.backFaceCulling = false;
+matSpeedLine.alpha = 0;
+
+for (let i = 0; i < SPEEDLINE_COUNT; i++) {
+  const angle  = (i / SPEEDLINE_COUNT) * Math.PI * 2;
+  const dist   = 1.8 + Math.random() * 1.4;
+  const len    = 0.9 + Math.random() * 0.8;
+  const sl     = BABYLON.MeshBuilder.CreatePlane('sl_' + i,
+    { width: 0.045, height: len }, scene);
+  sl.material  = matSpeedLine;
+  sl.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+  // Position relative to a forward anchor; we'll update in the loop
+  sl._angle = angle;
+  sl._dist  = dist;
+  sl._len   = len;
+  sl.isPickable = false;
+  speedLines.push(sl);
+}
+
+function updateSpeedLines(dt, spd) {
+  const speedT = (spd - BASE_SPD) / (MAX_SPD - BASE_SPD);
+  const t      = Math.max(0, (speedT - SPEEDLINE_THRESH) / (1 - SPEEDLINE_THRESH));
+  const alpha  = t * 0.38;
+  matSpeedLine.alpha = alpha;
+
+  if (alpha < 0.01) return;
+
+  // Anchor: just in front of camera, centred on player X
+  const anchorX = camera.position.x * 0.3;
+  const anchorY = 2.2;
+  const anchorZ = 4.0;
+
+  for (const sl of speedLines) {
+    // Drift lines toward camera over time for motion blur feel, then wrap
+    sl._angle += dt * (0.18 + t * 0.55);
+    const d = sl._dist;
+    sl.position.set(
+      anchorX + Math.cos(sl._angle) * d,
+      anchorY + Math.sin(sl._angle) * d * 0.55,
+      anchorZ
+    );
+    // Scale length with speed
+    sl.scaling.y = 0.6 + t * 1.2;
+  }
+}
+
+// ---- Camera micro-shake on landing ---------------------------------
+let camShakeT = 0;
+const CAM_SHAKE_DUR = 0.15;
+const CAM_SHAKE_AMP = 0.08;
+
+function triggerCamShake() { camShakeT = CAM_SHAKE_DUR; }
+
 // ---- UI helpers ----------------------------------------------------
 const hudEl       = document.getElementById('hud');
 const scoreEl     = document.getElementById('scoreDisplay');
@@ -1069,8 +1155,11 @@ function startGame() {
   bobT       = 0;
   muncherT   = 0;
   grazeInvincibleTimer = 0;
-  coinCount  = 0;
-  coinSpawnTimer = 0;
+  coinCount       = 0;
+  coinSpawnTimer  = 0;
+  coinStreak      = 0;
+  coinStreakTimer  = 0;
+  coinTrailPS.emitRate = 0;
 
   resetPlayer();
   clearObs();
@@ -1157,10 +1246,22 @@ engine.runRenderLoop(() => {
       const dz = Math.abs(c.position.z);
       if (dx < COIN_RADIUS && dz < COIN_RADIUS) {
         coinCount++;
+        coinStreak++;
+        coinStreakTimer = 0.55;  // reset gap timer on each collect
         updateCoinHud();
         collectCoin(c);
       }
     }
+
+    // Coin streak timer — break streak after gap
+    if (coinStreakTimer > 0) {
+      coinStreakTimer -= dt;
+      if (coinStreakTimer <= 0) coinStreak = 0;
+    }
+
+    // Coin trail: emit while streak >= 3
+    coinTrailPS.emitter.set(pPos.x, pPos.y + 0.1, 0);
+    coinTrailPS.emitRate = coinStreak >= 3 ? 28 : 0;
 
     // Lane switch tween (ease-in-out cubic, 130ms)
     if (laneTween.p < 1) {
@@ -1195,6 +1296,7 @@ engine.runRenderLoop(() => {
         jumping = false;
         squashT = SQUASH_DUR * 0.55;  // lighter squash on natural landing
         burstDust(pPos.x);
+        triggerCamShake();
       }
     }
 
@@ -1234,7 +1336,19 @@ engine.runRenderLoop(() => {
 
     // Camera follows player X
     camera.position.x += (pPos.x - camera.position.x) * Math.min(1, 7 * dt);
+
+    // Camera micro-shake on landing (Y bounce, decays over 150ms)
+    let shakeY = 0;
+    if (camShakeT > 0) {
+      camShakeT -= dt;
+      const p  = camShakeT / CAM_SHAKE_DUR;
+      shakeY   = Math.sin(p * Math.PI) * CAM_SHAKE_AMP;
+    }
+    camera.position.y = 7 + shakeY;
     camera.setTarget(new BABYLON.Vector3(camera.position.x * 0.25, 0.8, 20));
+
+    // Speed lines
+    updateSpeedLines(dt, speed);
 
     // ---- Chaser: retreats while player runs clean ----
     chaser.dist = Math.min(CHASER_MAX, chaser.dist + CHASER_RETREAT * dt);
