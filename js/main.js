@@ -34,7 +34,7 @@ scene.fogDensity = 0.022;
 
 // ---- Camera --------------------------------------------------------
 const camera = new BABYLON.FreeCamera('cam',
-  new BABYLON.Vector3(0, 7, -11), scene);
+  new BABYLON.Vector3(0, 9, -17), scene);
 camera.setTarget(new BABYLON.Vector3(0, 0.8, 20));
 camera.fov  = 0.9;
 camera.minZ = 0.1;
@@ -127,6 +127,10 @@ initObstacles(scene);
 initCoins(scene);
 initMuncher(scene);
 
+// Populate start screen high score
+const _initHs = getHighScore();
+hud.updateStartBest(_initHs.distance, _initHs.coins);
+
 // ---- Game state ----------------------------------------------------
 let gs         = 'START';
 let score      = 0;
@@ -134,6 +138,11 @@ let grazeInvincibleTimer = 0;
 let speed      = BASE_SPD;
 let spawnTimer = 0;
 let spawnIv    = SPAWN_T0;
+
+// ---- Title / start transition --------------------------------
+let _startingT = 0;
+const CAM_TITLE = { y: 9,  z: -17 };
+const CAM_PLAY  = { y: 7,  z: -11 };
 
 // ---- Death sequence state ------------------------------------
 let _deathT    = 0;
@@ -164,8 +173,8 @@ function startGame() {
   hud.setFadeBlack(0);
   showPlayer();
 
-  gs = 'PLAY';
-  startMusic();
+  _startingT = 0;
+  gs = 'STARTING';
 }
 
 function triggerDeathSequence() {
@@ -345,6 +354,29 @@ engine.runRenderLoop(() => {
     if (_deathT >= 1.2 && _deathGoShown) {
       gs = 'DEAD';
     }
+  }
+
+  if (gs === 'STARTING') {
+    _startingT += dt;
+    const p  = Math.min(1, _startingT / 0.4);
+    const ep = p < 0.5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
+    camera.position.y = CAM_TITLE.y + (CAM_PLAY.y - CAM_TITLE.y) * ep;
+    camera.position.z = CAM_TITLE.z + (CAM_PLAY.z - CAM_TITLE.z) * ep;
+    camera.setTarget(new BABYLON.Vector3(camera.position.x * 0.25, 0.8, 20));
+    updatePlayer(dt, () => {}, () => {});
+    muncherIdleAnim(dt);
+    if (p >= 1) {
+      gs = 'PLAY';
+      startMusic();
+    }
+  }
+
+  if (gs === 'START') {
+    camera.position.y = CAM_TITLE.y;
+    camera.position.z = CAM_TITLE.z;
+    camera.setTarget(new BABYLON.Vector3(0, 0.8, 20));
+    updatePlayer(dt, () => {}, () => {});
+    muncherIdleAnim(dt);
   }
 
   scene.render();

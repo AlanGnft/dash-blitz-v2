@@ -17,6 +17,8 @@ const goBestCoinsEl= document.getElementById('goBestCoins');
 const newBestEl    = document.getElementById('newBestBanner');
 const deathFlashEl = document.getElementById('deathFlash');
 const fadeBlackEl  = document.getElementById('fadeBlack');
+const startBestDistEl  = document.getElementById('startBestDist');
+const startBestCoinsEl = document.getElementById('startBestCoins');
 
 export const showHUD       = () => { hudEl.style.display = 'flex'; };
 export const hideHUD       = () => { hudEl.style.display = 'none'; };
@@ -72,6 +74,11 @@ export function setGoStats(distance, coins, bestDist, bestCoins, newDistRecord, 
   } else {
     newBestEl.classList.add('hidden');
   }
+}
+
+export function updateStartBest(dist, coins) {
+  startBestDistEl.textContent  = Math.floor(dist);
+  startBestCoinsEl.textContent = coins;
 }
 
 export function onStartClick(fn) {

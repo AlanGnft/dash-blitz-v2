@@ -114,6 +114,18 @@ html, body {
 }
 .hint span { color: #555; }
 
+/* ---- Start screen high score ---- */
+#startBest {
+  margin-top: 18px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(11px, 2vw, 14px);
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: #333;
+  text-transform: uppercase;
+}
+#startBest span { color: #555; }
+
 /* ---- Game Over ---- */
 .gameover-title {
   font-family: 'Bebas Neue', sans-serif;
